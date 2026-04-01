@@ -149,12 +149,14 @@ With `/clawteam`, the system can orchestrate roles and execution:
 | `clawteam-scrum-master` | Scrum Master | Iteration rhythm and blockers; ceremony and collaboration norms |
 
 Short aliases (e.g. `qa`, `sre`, `product-manager`) map to the `clawteam-*` roles above—see `docs/CLAWTEAM_SLASH_GUIDE.md`.
-
 **Why it matters:** Moves from “one model, one thread” to **multi-role collaborative problem solving**.
+
+<img width="2549" height="1728" alt="Screenshot - 2026-04-01 13 00 35" src="https://github.com/user-attachments/assets/d8115e02-fcdc-4781-8d42-41d0732200d0" />
 
 ### 3) `clawteam` deeploop: convergent closed-loop iteration
 
 `/clawteam --deep_loop` runs multiple converging rounds—not “one pass and done.”
+<img width="1938" height="380" alt="Screenshot - 2026-03-30 18 39 08" src="https://github.com/user-attachments/assets/656adcf5-0cb0-457b-b990-c09a54837920" />
 
 - Structured contract per round (goals, handoffs, gaps, …)
 - Parse `DEEP_LOOP_WRITEBACK_JSON` and write back automatically when configured
@@ -489,4 +491,4 @@ AI tooling may run commands and modify files. Use ClawCode in a controlled envir
 
 ## License
 
-MIT License.
+GPL-3.0 license.
