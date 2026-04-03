@@ -164,14 +164,16 @@ Short aliases (e.g. `qa`, `sre`, `product-manager`) map to the `clawteam-*` role
 
 **Why it matters:** Turns “feels done” into **metric-driven convergence**.
 
-### 4) Closed-loop learning: Experience / ECAP / TECAP
+### 4) ECAP Closed-loop learning: 
 
 ClawCode treats **experience** as a first-class artifact—not only conclusions, but **portable structure**:
+<img width="2730" height="1535" alt="ECAP技术示例" src="https://github.com/user-attachments/assets/480acf50-946f-44a1-8a06-d3254f0834f9" />
 
-- **Experience:** an experience function between goals and outcomes; **gap** drives improvement.
-- **ECAP** (Experience Capsule): individual/task-level capsules.
-- **TECAP** (Team Experience Capsule): team collaboration capsules.
-- **instinct–experience–skill:** reusable path from rules and experience to skills.
+- **Experience:** An experience function representing the gap between a goal and its outcome. It is a learnable function extracted from the process of resolving the goal–outcome gap, using that gap as the driver for improvement. The dimensional experience objects include: model_experience, agent_experience, skill_experience, and team_experience.
+- **ECAP** A personal/task-level experience capsule representing an evolvable triplet knowledge structure: (Instinct, Experience, Skill).
+- **TECAP** (Team Experience Capsule): A team collaboration experience capsule that includes collaboration steps, topology, and handoffs, and associates a role-level ECAP triplet with each team role.
+- **instinct → experience → skill:** A reusable construction chain from (instinct) rules, through experience, to skills.
+- **Model → Agent → Team:** A reusable learning path from a model, to an agent, to team collaboration of agents.
 
 #### Implementation mapping (concept to code)
 
