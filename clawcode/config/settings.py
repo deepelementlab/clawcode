@@ -321,7 +321,7 @@ class ClosedLoopConfig(BaseModel):
     experience_ab_enabled: bool = True
     experience_ab_domains: list[str] = Field(default_factory=list)
     clawteam_deeploop_enabled: bool = True
-    clawteam_deeploop_max_iters: int = 7
+    clawteam_deeploop_max_iters: int = 100
     clawteam_deeploop_min_gap_delta: float = 0.05
     clawteam_deeploop_convergence_rounds: int = 2
     clawteam_deeploop_handoff_target: float = 0.85

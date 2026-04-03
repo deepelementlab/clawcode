@@ -322,12 +322,13 @@ _CLAWTEAM_USAGE = (
 def _parse_clawteam_args(tail: str) -> tuple[str | None, str, bool, int, str]:
     """Return (selected_agent, request, deep_loop, max_iters, error)."""
     raw = (tail or "").strip()
+    default_max_iters = 100
     if not raw:
-        return None, "", False, 5, _CLAWTEAM_USAGE
+        return None, "", False, default_max_iters, _CLAWTEAM_USAGE
     try:
         tokens = shlex.split(raw)
     except ValueError as e:
-        return None, "", False, 5, f"Invalid `/clawteam` arguments: {e}\n\n{_CLAWTEAM_USAGE}"
+        return None, "", False, default_max_iters, f"Invalid `/clawteam` arguments: {e}\n\n{_CLAWTEAM_USAGE}"
 
     selected_agent: str | None = None
     deep_loop = False
@@ -352,7 +353,7 @@ def _parse_clawteam_args(tail: str) -> tuple[str | None, str, bool, int, str]:
                     None,
                     "",
                     False,
-                    5,
+                    default_max_iters,
                     f"`--max_iters` requires an integer value.\n\n{_CLAWTEAM_USAGE}",
                 )
             raw_iters = tokens[i + 1].strip()
@@ -363,7 +364,7 @@ def _parse_clawteam_args(tail: str) -> tuple[str | None, str, bool, int, str]:
                     None,
                     "",
                     False,
-                    5,
+                    default_max_iters,
                     f"`--max_iters` must be an integer (got `{raw_iters}`).\n\n{_CLAWTEAM_USAGE}",
                 )
             if max_iters < 1:
@@ -371,7 +372,7 @@ def _parse_clawteam_args(tail: str) -> tuple[str | None, str, bool, int, str]:
                     None,
                     "",
                     False,
-                    5,
+                    default_max_iters,
                     f"`--max_iters` must be >= 1 (got `{max_iters}`).\n\n{_CLAWTEAM_USAGE}",
                 )
             i += 2
@@ -387,11 +388,11 @@ def _parse_clawteam_args(tail: str) -> tuple[str | None, str, bool, int, str]:
             None,
             "",
             False,
-            5,
+            default_max_iters,
             f"Unknown `/clawteam` agent `{selected_agent}`.\n\n{_CLAWTEAM_USAGE}",
         )
     if not req:
-        return None, "", False, 5, _CLAWTEAM_USAGE
+        return None, "", False, default_max_iters, _CLAWTEAM_USAGE
     return selected_agent, req, deep_loop, max_iters, ""
 
 
@@ -400,7 +401,7 @@ def _build_clawteam_prompt(
     selected_agent: str | None,
     *,
     deep_loop: bool = False,
-    max_iters: int = 5,
+    max_iters: int = 100,
     tecap_context: list[dict[str, object]] | None = None,
     role_ecap_context: dict[str, dict[str, object]] | None = None,
     deeploop_thresholds: dict[str, object] | None = None,

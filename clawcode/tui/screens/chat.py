@@ -7,9 +7,11 @@ with the AI agent.
 from __future__ import annotations
 
 import asyncio
+import ast
 import json
 import logging
 import re
+import shlex
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -182,6 +184,60 @@ def _parse_clawteam_namespace_slash(raw_text: str) -> tuple[str, str] | None:
     return head, tail.strip() if sep else ""
 
 
+def _extract_deep_loop_eval(text: str) -> tuple[bool, float | None]:
+    """Parse deep loop convergence signal from assistant text."""
+    raw = str(text or "")
+    marker = "DEEP_LOOP_EVAL_JSON:"
+    converged: bool | None = None
+    delta_score: float | None = None
+
+    pos = raw.rfind(marker)
+    if pos >= 0:
+        payload = raw[pos + len(marker) :].strip()
+        line = payload.splitlines()[0].strip() if payload else ""
+        if line:
+            # Strict JSON first.
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict):
+                    c = obj.get("converged")
+                    if isinstance(c, bool):
+                        converged = c
+                    ds = obj.get("delta_score")
+                    if isinstance(ds, (int, float)):
+                        delta_score = float(ds)
+            except Exception:
+                # Fallback: Python-literal dict style with single quotes.
+                normalized = re.sub(r"\btrue\b", "True", line, flags=re.IGNORECASE)
+                normalized = re.sub(r"\bfalse\b", "False", normalized, flags=re.IGNORECASE)
+                normalized = re.sub(r"\bnull\b", "None", normalized, flags=re.IGNORECASE)
+                try:
+                    obj2 = ast.literal_eval(normalized)
+                    if isinstance(obj2, dict):
+                        c2 = obj2.get("converged")
+                        if isinstance(c2, bool):
+                            converged = c2
+                        ds2 = obj2.get("delta_score")
+                        if isinstance(ds2, (int, float)):
+                            delta_score = float(ds2)
+                except Exception:
+                    pass
+
+    # Text fallback for both fields.
+    if converged is None:
+        m_c = re.search(r"\bconverged\s*[:=]\s*(true|false)\b", raw, flags=re.IGNORECASE)
+        if m_c:
+            converged = m_c.group(1).lower() == "true"
+    if delta_score is None:
+        m_d = re.search(r"\bdelta_score\s*[:=]\s*(-?\d+(?:\.\d+)?)\b", raw, flags=re.IGNORECASE)
+        if m_d:
+            try:
+                delta_score = float(m_d.group(1))
+            except Exception:
+                delta_score = None
+    return bool(converged), delta_score
+
+
 def _hud_project_hint(hud_dir: str) -> str:
     """Last path segments for HUD; avoid useless Windows-only hints like `D:`."""
     try:
@@ -348,6 +404,8 @@ class ChatScreen(Screen):
         # Map TaskCreate taskId -> index in _hud_todos (best-effort, mirrors claude-hud resolveTaskIndex behavior)
         self._hud_task_id_to_index: dict[str, int] = {}
         self._hud_running_tools: dict[str, HudRunningTool] = {}
+        self._clawteam_deep_loop_state: dict[str, dict[str, Any]] = {}
+        self._clawteam_deep_loop_last_response: dict[str, str] = {}
         self._hud_plugin_manager: Any = None
         self._hud_project_dir: str = ""
         self._hud_counts_last_refresh: float = 0.0
@@ -2645,6 +2703,129 @@ class ChatScreen(Screen):
             claw_mode_enabled=bool(getattr(self, "_claw_mode_enabled", False)),
         )
 
+    def _clawteam_loop_store(self) -> dict[str, dict[str, Any]]:
+        return self._clawteam_deep_loop_state
+
+    def _clawteam_last_response_store(self) -> dict[str, str]:
+        return self._clawteam_deep_loop_last_response
+
+    def _append_clawteam_deep_loop_log(self, session_id: str, text: str) -> None:
+        sid = (session_id or "").strip()
+        if not sid:
+            return
+        try:
+            message_list = self._ensure_message_list(sid)
+            message_list.display = True
+            message_list.start_assistant_message()
+            message_list.update_content(text)
+            message_list.finalize_message()
+        except Exception:
+            # Unit tests may call this helper without mounted widgets.
+            return
+
+    def _parse_clawteam_deep_loop_runtime_args(self, raw_content: str) -> tuple[bool, int]:
+        """Best-effort parse for `/clawteam ... --deep_loop [--max_iters n]`."""
+        head, tail = parse_slash_line(raw_content)
+        ns = _parse_clawteam_namespace_slash(raw_content)
+        if ns is not None:
+            c_agent, c_tail = ns
+            head = "clawteam"
+            tail = f"--agent {c_agent}" + (f" {c_tail}" if c_tail else "")
+        if head != "clawteam":
+            return False, int(getattr(self.settings.closed_loop, "clawteam_deeploop_max_iters", 100) or 100)
+        deep_loop = False
+        max_iters = int(getattr(self.settings.closed_loop, "clawteam_deeploop_max_iters", 100) or 100)
+        try:
+            tokens = shlex.split((tail or "").strip())
+        except Exception:
+            tokens = (tail or "").split()
+        i = 0
+        while i < len(tokens):
+            tok = tokens[i]
+            if tok == "--deep_loop":
+                deep_loop = True
+                i += 1
+                continue
+            if tok == "--max_iters" and i + 1 < len(tokens):
+                try:
+                    parsed = int(tokens[i + 1])
+                    if parsed >= 1:
+                        max_iters = parsed
+                except Exception:
+                    pass
+                i += 2
+                continue
+            i += 1
+        return deep_loop, max_iters
+
+    def _continue_clawteam_deep_loop_if_needed(self, session_id: str) -> None:
+        sid = (session_id or "").strip()
+        if not sid:
+            return
+        state = self._clawteam_loop_store().get(sid)
+        if not isinstance(state, dict):
+            return
+        run_state = self._get_run_state(sid, create=False)
+        if run_state is not None and run_state.is_processing:
+            return
+        iter_idx = int(state.get("iter_idx", 1) or 1)
+        max_iters = int(state.get("max_iters", 100) or 100)
+        min_iters = int(state.get("min_iters", 2) or 2)
+        last_text = self._clawteam_last_response_store().get(sid, "")
+        converged, delta_score = _extract_deep_loop_eval(last_text)
+        delta_text = f"{delta_score:.4f}" if isinstance(delta_score, float) else "unknown"
+        self._append_clawteam_deep_loop_log(
+            sid,
+            f"[clawteam deep_loop] 迭代 {iter_idx}/{max_iters} 收敛判定："
+            f" converged={str(converged).lower()} · delta_score={delta_text}",
+        )
+        if iter_idx >= max_iters:
+            self._append_clawteam_deep_loop_log(
+                sid,
+                f"[clawteam deep_loop] 结束：达到最大轮次 {max_iters}/{max_iters}。",
+            )
+            self._clawteam_loop_store().pop(sid, None)
+            self._clawteam_last_response_store().pop(sid, None)
+            return
+        if converged and iter_idx >= min_iters:
+            self._append_clawteam_deep_loop_log(
+                sid,
+                f"[clawteam deep_loop] 结束：第 {iter_idx} 轮满足收敛条件（最少轮次={min_iters}）。",
+            )
+            self._clawteam_loop_store().pop(sid, None)
+            self._clawteam_last_response_store().pop(sid, None)
+            return
+
+        next_iter = iter_idx + 1
+        state["iter_idx"] = next_iter
+        self._append_clawteam_deep_loop_log(
+            sid,
+            f"[clawteam deep_loop] 迭代 {next_iter}/{max_iters} 开始",
+        )
+        base_prompt = str(state.get("base_prompt", "") or "")
+        runtime_prompt = (
+            f"{base_prompt}\n\n"
+            "RUNTIME ENFORCEMENT (system hard-constraint):\n"
+            f"- Current iteration: {next_iter}/{max_iters}\n"
+            f"- Do NOT stop before iteration {min_iters}\n"
+            "- Keep using clawteam protocol and produce DEEP_LOOP_EVAL_JSON at end.\n\n"
+            "Previous iteration output (for continuation):\n"
+            f"{last_text}\n"
+        )
+        self._start_agent_run(
+            session_id=sid,
+            display_content=f"迭代 {next_iter}/{max_iters}",
+            content_for_agent=runtime_prompt,
+            attachments=None,
+            is_plan_run=False,
+            plan_user_request="",
+            plan_artifact_scope="",
+            plan_routing_meta=None,
+            response_artifact_subdir="",
+            build_task_index=-1,
+            is_claw_run=False,
+        )
+
     async def _run_builtin_slash_send(
         self,
         raw_content: str,
@@ -2898,6 +3079,24 @@ class ChatScreen(Screen):
                 sid_slash = (self.current_session_id or "").strip()
                 if sid_slash and isinstance(deeploop_meta, dict) and deeploop_meta:
                     clawteam_deeploop_set_pending(sid_slash, deeploop_meta)
+                if head == "clawteam" and sid_slash:
+                    deep_loop_enabled, deep_loop_max_iters = self._parse_clawteam_deep_loop_runtime_args(raw_content)
+                    if deep_loop_enabled:
+                        self._clawteam_loop_store()[sid_slash] = {
+                            "iter_idx": 1,
+                            "max_iters": deep_loop_max_iters,
+                            "min_iters": 2,
+                            "base_prompt": outcome.agent_user_text,
+                            "requirement": tail,
+                        }
+                        self._clawteam_last_response_store().pop(sid_slash, None)
+                        self._append_clawteam_deep_loop_log(
+                            sid_slash,
+                            f"[clawteam deep_loop] 迭代 1/{deep_loop_max_iters} 开始",
+                        )
+                    else:
+                        self._clawteam_loop_store().pop(sid_slash, None)
+                        self._clawteam_last_response_store().pop(sid_slash, None)
                 is_multi_plan = head == "multi-plan"
                 is_multi_execute = head == "multi-execute"
                 is_multi_backend = head == "multi-backend"
@@ -3675,10 +3874,13 @@ class ChatScreen(Screen):
                 msg = event.message
                 if msg:
                     message_list.finalize_message(msg)
+                    self._clawteam_last_response_store()[session_id] = msg.content or ""
                     try:
                         self._maybe_finalize_clawteam_deeploop_from_assistant(session_id, msg.content or "")
                     except Exception:
                         _logger.exception("clawteam deeploop finalize hook failed")
+                    # Continue deep loop only after run lock is released in _process_message.finally.
+                    self.call_later(lambda sid=session_id: self._continue_clawteam_deep_loop_if_needed(sid))
                 elif run_state is not None and run_state.build_task_index >= 0:
                     message_list.finalize_message()
 

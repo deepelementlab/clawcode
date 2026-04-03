@@ -24,6 +24,8 @@ class InfoPanelModel:
 
 
 class InfoPanel(Static):
+    MAX_VISIBLE_LSP_LINES = 6
+
     DEFAULT_CSS = """
     InfoPanel {
         height: auto;
@@ -52,8 +54,12 @@ class InfoPanel(Static):
 
         out.append("LSP Configuration\n", style=f"bold {accent}")
         if model.lsp_lines:
-            for ln in model.lsp_lines:
+            visible = model.lsp_lines[: self.MAX_VISIBLE_LSP_LINES]
+            for ln in visible:
                 out.append(f"  {ln}\n")
+            hidden_count = len(model.lsp_lines) - len(visible)
+            if hidden_count > 0:
+                out.append(f"  ... and {hidden_count} more\n", style=muted)
         else:
             out.append("  (none)\n", style=muted)
         out.append("\n")
@@ -73,14 +79,21 @@ class InfoPanel(Static):
 
 def format_lsp_lines(items: Iterable[tuple[str, str]]) -> list[str]:
     """Format LSP config as lines: '• Name (cmd ...)'."""
+    max_len = 80
+
+    def _clip(text: str) -> str:
+        if len(text) <= max_len:
+            return text
+        return text[: max_len - 1] + "…"
+
     out: list[str] = []
     for name, cmd in items:
         nm = (name or "").strip() or "LSP"
         cm = (cmd or "").strip()
         if cm:
-            out.append(f"• {nm} ({cm})")
+            out.append(_clip(f"• {nm} ({cm})"))
         else:
-            out.append(f"• {nm}")
+            out.append(_clip(f"• {nm}"))
     return out
 
 

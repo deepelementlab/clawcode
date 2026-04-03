@@ -1186,7 +1186,7 @@ class LearningService:
     def get_clawteam_deeploop_config(self) -> dict[str, Any]:
         return {
             "enabled": bool(getattr(self.settings.closed_loop, "clawteam_deeploop_enabled", True)),
-            "max_iters": int(getattr(self.settings.closed_loop, "clawteam_deeploop_max_iters", 7) or 7),
+            "max_iters": int(getattr(self.settings.closed_loop, "clawteam_deeploop_max_iters", 100) or 100),
             "min_gap_delta": self._cl_float("clawteam_deeploop_min_gap_delta", 0.05),
             "convergence_rounds": int(getattr(self.settings.closed_loop, "clawteam_deeploop_convergence_rounds", 2) or 2),
             "handoff_target": self._cl_float("clawteam_deeploop_handoff_target", 0.85),
@@ -1275,7 +1275,7 @@ class LearningService:
         min_gap_delta = float(cfg.get("min_gap_delta", 0.05) or 0.05)
         rounds = int(cfg.get("convergence_rounds", 2) or 2)
         target_handoff = float(cfg.get("handoff_target", 0.85) or 0.85)
-        max_iters = int(cfg.get("max_iters", 7) or 7)
+        max_iters = int(cfg.get("max_iters", 100) or 100)
         max_rb = int(max_rollbacks if max_rollbacks is not None else cfg.get("max_rollbacks", 2) or 2)
         deltas = [abs(float((x or {}).get("gap_delta", 1.0) or 1.0)) for x in iteration_records[-rounds:]]
         handoffs = [float((x or {}).get("handoff_success_rate", 0.0) or 0.0) for x in iteration_records[-rounds:]]
