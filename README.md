@@ -1,8 +1,20 @@
 # ClawCode
 
-ClawCode is claude code inspired implementation in python and Rust focused on agents and experience-based evolution, and is an Open-source coding-agent CLI for Anthropic, OpenAI, Gemini, DeepSeek, GLM, Kimit, Ollama, Codex, GitHub Models, and 200+ models via OpenAI-compatible APIs.
+ClawCode is a Claude Code‑inspired implementation in Python and Rust, focused on agents and experience‑based evolution. It is also an open‑source coding‑agent CLI for Anthropic, OpenAI, Gemini, DeepSeek, GLM, Kimi, Ollama, Codex, GitHub Models, and 200+ models via OpenAI‑compatible APIs.
 
-We hope to make it an open and excellent creative development tool, a useful AI programming Swiss Army knife in your hands，and on the basis of the coder agent framework, we introduce an algorithm module based on experience driven autonomous reinforcement learning: Turn **idea → memory → plan → code → verify → review → learned experience** into one executable, learnable, evolving engineering loop.
+We hope to make it an open and excellent creative development tool – a useful AI programming Swiss Army knife in your hands.
+
+The foundation is the coder agent framework: tool‑use, skills, memory, and multi‑agent coordination. On this basis, we further expanded and built the claw framework, which supports integration of more tools, compatibility with OpenClaw skill applications, and extended computer‑usage capabilities. This is meant to meet future, more omplex and diverse work (similar to cowork, but we focus more on development tasks – though this part still needs improvement).
+
+But these alone may not be enough. In our own projects and usage processes, we generate a lot of development data. That data goes through multiple iterations and decision‑making processes, gradually converging. We believe this data is valuable, and it would be a pity if it were only used as nourishment (or feedback) for large model companies.
+
+Therefore, we attempt to build an evolving subsystem that uses this data to continuously improve the performance of the agents mentioned above. All this data and related information is stored locally and will never leave your control. Moreover, the system is fully open source, auditable, and has no hidden telemetry or data collection.
+
+Simply put, we introduce an algorithm framework driven by experience‑based autonomous reinforcement learning. It turns the following process:
+
+idea → memory → plan → code → verify → review → learned experience
+
+into an executable, learnable, and evolving engineering loop.
 
 <img width="2549" height="930" alt="ClawCode screenshot" src="https://github.com/user-attachments/assets/6cc0814a-aa3e-4f56-98dc-5123ecf88a1c" />
 
@@ -35,21 +47,12 @@ We hope to make it an open and excellent creative development tool, a useful AI 
 
 ---
 
-## What is ClawCode?
-
-If you think of an AI coding assistant as “a chat box that writes code,” ClawCode is not in that category.  
-ClawCode is positioned as a **creative dev tool + engineering execution system**.
-
-- For individuals: a durable terminal partner that doesn’t only answer “how,” but helps you **finish and verify**.
-- For teams: a governable intelligent workspace with role splits, policy configuration, session continuity, and experience write-back.
-
-Think of it as an AI engineering Swiss Army knife: immediate execution **and** long-term learning and self-improvement.
-
----
-
 ## Product vision
 
-ClawCode is not “yet another chat assistant”; it is a creative dev tool aimed at real delivery. Core motivations:
+ClawCode is a creative dev tool aimed at real delivery. Core motivations:
+
+<img width="1376" height="768" alt="Generated_image" src="https://github.com/user-attachments/assets/1a09bd15-9859-413d-a1f3-f0c573e12b99" />
+
 
 - **Turn ideas into runnable code quickly**  
   From “I have an idea” to “implemented and verified,” with less context switching and tool friction.
