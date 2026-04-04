@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import socket
 import threading
 import time
@@ -212,10 +213,15 @@ class LearningService:
 
     def _enforce_knowledge_lifecycle(self) -> dict[str, Any]:
         try:
-            max_ecap = int(getattr(self.settings.closed_loop, "knowledge_max_ecap", 200) or 200)
-            max_tecap = int(getattr(self.settings.closed_loop, "knowledge_max_tecap", 200) or 200)
+            cl = self.settings.closed_loop
+            max_ecap = int(getattr(cl, "knowledge_max_ecap", 200) or 200)
+            max_tecap = int(getattr(cl, "knowledge_max_tecap", 200) or 200)
+            max_e_skills = int(getattr(cl, "knowledge_max_evolved_skill_packages", 80) or 0)
+            max_e_cmd = int(getattr(cl, "knowledge_max_evolved_command_md", 100) or 0)
+            max_e_ag = int(getattr(cl, "knowledge_max_evolved_agent_md", 100) or 0)
         except Exception:
             max_ecap, max_tecap = 200, 200
+            max_e_skills, max_e_cmd, max_e_ag = 80, 100, 100
         ecap_dir, tecap_dir = self._knowledge_dirs()
         deleted: list[str] = []
         for d, lim in [(ecap_dir, max_ecap), (tecap_dir, max_tecap)]:
@@ -228,10 +234,62 @@ class LearningService:
                     deleted.append(str(stale))
                 except OSError:
                     pass
+
+        evolved_deleted: dict[str, list[str]] = {"skill_dirs": [], "command_md": [], "agent_md": []}
+        skills_root = self.paths.evolved_skills_dir
+        if max_e_skills > 0 and skills_root.exists():
+            pkg_rows: list[tuple[float, Path]] = []
+            for child in skills_root.iterdir():
+                if not child.is_dir():
+                    continue
+                skill_md = child / "SKILL.md"
+                if not skill_md.is_file():
+                    continue
+                try:
+                    pkg_rows.append((float(skill_md.stat().st_mtime), child))
+                except OSError:
+                    continue
+            pkg_rows.sort(key=lambda x: -x[0])
+            for _, path in pkg_rows[max_e_skills:]:
+                try:
+                    shutil.rmtree(path, ignore_errors=False)
+                    evolved_deleted["skill_dirs"].append(str(path))
+                except OSError:
+                    pass
+
+        def _prune_top_level_md(root: Path, limit: int, bucket: str) -> None:
+            if limit <= 0 or not root.exists():
+                return
+            mds = sorted(
+                [p for p in root.glob("*.md") if p.is_file()],
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            for stale in mds[limit:]:
+                try:
+                    stale.unlink()
+                    evolved_deleted[bucket].append(str(stale))
+                except OSError:
+                    pass
+
+        _prune_top_level_md(self.paths.evolved_commands_dir, max_e_cmd, "command_md")
+        _prune_top_level_md(self.paths.evolved_agents_dir, max_e_ag, "agent_md")
+
+        evolved_total = sum(len(v) for v in evolved_deleted.values())
         report = {
             "deleted_count": len(deleted),
             "deleted_paths": deleted[:20],
-            "limits": {"ecap": max_ecap, "tecap": max_tecap},
+            "limits": {
+                "ecap": max_ecap,
+                "tecap": max_tecap,
+                "evolved_skill_packages": max_e_skills,
+                "evolved_command_md": max_e_cmd,
+                "evolved_agent_md": max_e_ag,
+            },
+            "evolved_deleted_count": evolved_total,
+            "evolved_deleted_paths": {
+                k: v[:20] for k, v in evolved_deleted.items() if v
+            },
         }
         rep_dir = self.settings.get_data_directory() / "learning" / "reports"
         rep_dir.mkdir(parents=True, exist_ok=True)
@@ -1655,10 +1713,11 @@ class LearningService:
         domain: str = "",
         experiment_id: str = "",
         handoff_success_rate: float = 0.0,
+        force: bool = False,
     ) -> dict[str, Any]:
         """Chain iteration log + TECAP writeback + role ECAP writeback when auto-writeback is enabled."""
         cfg = self.get_clawteam_deeploop_config()
-        if not bool(cfg.get("auto_writeback_enabled", True)):
+        if not force and not bool(cfg.get("auto_writeback_enabled", True)):
             return {"skipped": True, "reason": "clawteam_deeploop_auto_writeback_disabled"}
         row = self.record_clawteam_iteration_feedback(
             tecap_id=tecap_id,
@@ -1710,6 +1769,73 @@ class LearningService:
             "iteration_feedback": row,
             "tecap_writeback": tecap_wb,
             "role_ecap_writeback": role_wb,
+        }
+
+    @staticmethod
+    def _flatten_role_ecap_map_for_writeback(role_ecap_map: dict[str, Any] | None) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for k, v in (role_ecap_map or {}).items():
+            if isinstance(v, str) and str(v).strip():
+                out[str(k)] = str(v).strip()
+            elif isinstance(v, dict):
+                eid = v.get("ecap_id") or v.get("id")
+                if eid:
+                    out[str(k)] = str(eid).strip()
+        return out
+
+    def apply_structured_team_round_metrics(
+        self,
+        *,
+        tecap_id: str,
+        metrics: dict[str, Any],
+        iteration: int = 1,
+        role_ecap_map: dict[str, Any] | None = None,
+        force_writeback: bool = False,
+        trace_id: str = "",
+        cycle_id: str = "",
+        policy_id: str = "",
+        domain: str = "",
+        experiment_id: str = "",
+    ) -> dict[str, Any]:
+        """Apply CI/review structured metrics (phase B) via deeploop writeback chain."""
+        from .team_round_metrics import aggregate_team_round_metrics
+
+        agg = aggregate_team_round_metrics(metrics)
+        cap = load_team_capsule(self.settings, tecap_id)
+        if cap is None:
+            return {"ok": False, "error": "tecap_not_found", "tecap_id": tecap_id}
+        gap_before = float(cap.team_experience_fn.gap or 0.0)
+        source_map = dict(role_ecap_map) if role_ecap_map is not None else dict(cap.role_ecap_map or {})
+        flat_roles = LearningService._flatten_role_ecap_map_for_writeback(source_map)
+        fin = self.finalize_clawteam_deeploop_writeback(
+            tecap_id=tecap_id,
+            iteration=iteration,
+            iteration_goal=agg.summary_goal,
+            role_handoff_result=agg.summary_handoff,
+            gap_before=gap_before,
+            gap_after=agg.suggested_gap_after,
+            deviation_reason=agg.deviation_reason,
+            role_ecap_map=flat_roles,
+            observed_score=agg.observed_score,
+            result=agg.result,
+            trace_id=trace_id,
+            cycle_id=cycle_id,
+            policy_id=policy_id,
+            domain=domain,
+            experiment_id=experiment_id,
+            handoff_success_rate=agg.handoff_success_rate,
+            force=force_writeback,
+        )
+        return {
+            "ok": True,
+            "aggregated": {
+                "observed_score": agg.observed_score,
+                "result": agg.result,
+                "handoff_success_rate": agg.handoff_success_rate,
+                "suggested_gap_after": agg.suggested_gap_after,
+                "deviation_reason": agg.deviation_reason,
+            },
+            "finalize": fin,
         }
 
     def finalize_clawteam_deeploop_from_output(

@@ -28,7 +28,7 @@ alembic>=1.12.0
 # ============================================================
 anthropic>=0.40.0
 openai>=1.0.0
-google-genai>=1.0.0
+google-generativeai>=0.8.0
 
 # ============================================================
 # HTTP & Networking
@@ -46,11 +46,82 @@ pygments>=2.17.0
 # File Operations
 # ============================================================
 wcmatch>=8.5.0
+python-magic>=0.4.27
 aiofiles>=24.0.0
 python-dateutil>=2.8.0
 
 # ============================================================
-# Optional: python-magic (for file type detection)
-# Note: May require additional system libraries on Windows
+# Clipboard
 # ============================================================
-# python-magic>=0.4.27
+pyperclip>=1.9.0
+
+# ============================================================
+# Optional installs (see pyproject.toml [project.optional-dependencies])
+# ============================================================
+#
+# Recommended: install from this directory (where pyproject.toml lives) using extras.
+#   pip install -e .
+#   pip install -e ".[dev]"
+#   pip install -e ".[web]"
+#   pip install -e ".[desktop]"
+#   pip install -e ".[terminal-pty]"
+#   pip install -e ".[environments-docker]"
+#   pip install -e ".[native-performance]"
+#   # or combine:
+#   pip install -e ".[dev,web,desktop,terminal-pty,environments-docker]"
+#
+# native-performance also needs: Rust toolchain + maturin (see clawcode/llm/tools/performance/README.md).
+# After installing the extra, build the extension from:
+#   clawcode/llm/tools/performance/core/engine-py
+#   maturin develop --release
+#
+# ------------------------------------------------------------
+# [dev] — tests, lint, typecheck, pre-commit
+# pip install -e ".[dev]"
+# ------------------------------------------------------------
+# pytest>=8.0.0
+# pytest-asyncio>=0.23.0
+# pytest-cov>=4.1.0
+# ruff>=0.6.0
+# mypy>=1.10.0
+# pre-commit>=3.7.0
+#
+# ------------------------------------------------------------
+# [web] — Firecrawl + YAML for optional web tooling
+# pip install -e ".[web]"
+# ------------------------------------------------------------
+# firecrawl-py
+# pyyaml
+#
+# ------------------------------------------------------------
+# [desktop] — screenshots / desktop_* tools (enable in settings)
+# pip install -e ".[desktop]"
+# ------------------------------------------------------------
+# mss>=9.0.0
+# pyautogui>=0.9.54
+# Pillow>=10.0.0
+#
+# ------------------------------------------------------------
+# [terminal-pty] — PTY for terminal(background=true, pty=true) on POSIX
+# pip install -e ".[terminal-pty]"
+# ------------------------------------------------------------
+# ptyprocess>=0.7.0
+#
+# ------------------------------------------------------------
+# [environments-docker] — docker env helper (optional)
+# pip install -e ".[environments-docker]"
+# ------------------------------------------------------------
+# minisweagent
+#
+# ------------------------------------------------------------
+# [native-performance] — Rust-backed grep/glob (clawcode_performance)
+# pip install -e ".[native-performance]"
+# Requires: Rust + pip install "maturin>=1.7,<2" for local builds (see engine-py/pyproject.toml).
+# ------------------------------------------------------------
+# clawcode-performance @ file:./clawcode/llm/tools/performance/core/engine-py
+#
+# ------------------------------------------------------------
+# [claw-mode] — placeholder extra (empty); reserved for future optional Claw deps
+# pip install -e ".[claw-mode]"
+# ------------------------------------------------------------
+# (no additional packages)

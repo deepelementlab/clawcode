@@ -1,4 +1,4 @@
-﻿"""Permission dialog for tool calls.
+"""Permission dialog for tool calls.
 
 This module provides a dialog that asks users to approve or deny
 tool execution requests:
@@ -102,7 +102,15 @@ class PermissionDialog(ModalScreen):
     def _dismiss_with_result(self, result: bool | str) -> None:
         """Dismiss with result so push_screen callback receives it."""
         self.result = result
-        self.dismiss(result)
+        try:
+            self.dismiss(result)
+        except Exception as exc:
+            # Unit tests may call action_* without a running Textual app; result is still recorded.
+            if type(exc).__name__ == "NoActiveAppError":
+                return
+            if isinstance(exc, LookupError) and exc.args and "active_app" in repr(exc.args[0]):
+                return
+            raise
 
     def action_allow_once(self) -> None:
         self._dismiss_with_result(True)

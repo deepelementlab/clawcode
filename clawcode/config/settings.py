@@ -225,6 +225,13 @@ class ClosedLoopConfig(BaseModel):
     """Closed-loop learning governance and observability knobs."""
 
     memory_governance_enabled: bool = True
+    #: Capsule JSON retention under learning/experience|team-experience/capsules (newest kept).
+    knowledge_max_ecap: int = 200
+    knowledge_max_tecap: int = 200
+    #: Evolved artifact caps (0 = skip pruning for that bucket). See LearningService._enforce_knowledge_lifecycle.
+    knowledge_max_evolved_skill_packages: int = 80
+    knowledge_max_evolved_command_md: int = 100
+    knowledge_max_evolved_agent_md: int = 100
     flush_budget_enabled: bool = True
     search_rerank_enabled: bool = True
     skill_audit_enabled: bool = True

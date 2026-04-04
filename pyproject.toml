@@ -1,5 +1,6 @@
 [build-system]
-requires = ["hatchling"]
+# 1.27+ improves PEP 660 editable metadata with current pip; avoids missing prepare_metadata_for_build_editable on some setups.
+requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -77,7 +78,7 @@ dependencies = [
 claw-mode = []
 # Rust PyO3 extension: pip install maturin, then maturin develop in core/engine-py (see llm/tools/performance/README.md).
 native-performance = [
-    "clawcode-performance @ file:./llm/tools/performance/core/engine-py",
+    "clawcode-performance @ file:./clawcode/llm/tools/performance/core/engine-py",
 ]
 # PTY for terminal(background=true, pty=true) on POSIX; without it, pipe mode is used.
 terminal-pty = [
@@ -107,12 +108,18 @@ dev = [
 
 [project.scripts]
 clawcode = "clawcode.cli.commands:cli"
+clawcode-autonomous-cycle = "clawcode.learning.autonomous_cycle_cli:main"
+clawcode-apply-team-round = "clawcode.learning.apply_team_round_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/clawcode-ai/clawcode"
 Documentation = "https://github.com/clawcode-ai/clawcode#readme"
 Repository = "https://github.com/clawcode-ai/clawcode"
 Issues = "https://github.com/clawcode-ai/clawcode/issues"
+
+# `native-performance` 使用 `package @ file:...` 形式的直接引用，需显式允许
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["clawcode"]
