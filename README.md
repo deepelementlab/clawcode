@@ -1,4 +1,25 @@
-# ClawCode
+<p align="center">
+ <img width="256" height="256" alt="Screenshot - 2026-03-26 20 36 43" src="https://github.com/user-attachments/assets/03466089-8b3d-47f8-a454-06a8874eb727" />
+</p>
+
+<h1 align="center">ClawCode</h1>
+
+<p align="center">
+  <strong>Your creative dev tool , AI programming Swiss Army knife</strong>
+</p>
+
+<p align="center">
+  <a href="#license"><img src="https://img.shields.io/badge/license-GPL%20OR%20Apache%202.0-blue.svg" alt="License: GPL-3.0" /></a>
+  <a href=""><img src="https://img.shields.io/badge/Telegram-%40clawcode-26A5E4?style=flat&logo=telegram&logoColor=white" alt="Telegram: @clawcodeAI" /></a>
+  <a href="https://gitcgr.com/nearai/clawcode">
+    <img src="https://gitcgr.com/badge/nearai/clawcode.svg" alt="gitcgr" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.zh-CN.md">简体中文</a> 
+</p>
 
 ClawCode is a Claude Code‑inspired implementation in Python and Rust, focused on agents and experience‑based evolution. It is also an open‑source coding‑agent CLI for Anthropic, OpenAI, Gemini, DeepSeek, GLM, Kimi, Ollama, Codex, GitHub Models, and 200+ models via OpenAI‑compatible APIs.
 
@@ -18,7 +39,6 @@ into an executable, learnable, and evolving engineering loop.
 
 <img width="2549" height="930" alt="ClawCode screenshot" src="https://github.com/user-attachments/assets/6cc0814a-aa3e-4f56-98dc-5123ecf88a1c" />
 
-**English (this page)** · [简体中文](README.zh.md)
 
 ---
 
@@ -69,12 +89,15 @@ ClawCode is a creative dev tool aimed at real delivery. Core motivations:
 - **Execute “full-stack” engineering tasks end-to-end**  
   Beyond one-off codegen: planning, delegation, execution, verification, review, and structured learning.
 
-### Full-stack task execution stack (Claw framework + tools + computer use)
+### Development assistance functions
+
+### Full-stack task execution stack (AI Coding + Claw framework + tools + computer use)
 
 “Full-stack” tasks are not a single codegen step—they chain **planning, coding, verification, review, environment actions, and learning** into one executable path. ClawCode implements three layers:
 
 | Layer | Role | Key components / commands | Typical tasks | Entry points |
 |---|---|---|---|---|
+| Coder agent (default terminal runtime)	| The default interactive path: Textual TUI wires sessions/messages, builds a coder runtime bundle from settings, and runs the main Agent loop (or ClawAgent.run_claw_turn when Claw mode is on). It owns send/finalize, HUD, plan state, and optional memory injection—without requiring /claw or workflow slash commands.|ChatScreen, _finalize_send_after_input, _start_agent_run, _process_message, build_coder_runtime, make_claw_agent / make_plain_agent, Agent.run, ClawAgent.run_claw_turn, _handle_agent_event, _rebuild_llm_stack|Everyday coding in the terminal: chat turns, file edits via tools, plan-style flows when /plan is active, model switch (e.g. Ctrl+O stack rebuild), non-Claw and Claw branches from the same screen|clawcode/tui/screens/chat.py, clawcode/llm/runtime_bundle.py, clawcode/llm/agent.py, clawcode/cli/commands.py (create_app, run_tui)|
 | Claw framework (agent runtime) | In Claw mode, `ClawAgent` runs multi-step work aligned with the main agent loop, with iteration budget and sub-agent coordination | `/claw`, `ClawAgent.run_claw_turn`, `run_agent` / `run_conversation` | Phased complex tasks, cross-turn context, bounded multi-round execution | `docs/CLAW_MODE.md`, `clawcode/llm/claw.py` |
 | Tool orchestration (engineering execution) | Slash commands and tools drive plan-to-delivery flows: collaboration, review, diagnostics, learning | `/clawteam`, `/architect`, `/tdd`, `/code-review`, `/orchestrate`, `/multi-*` | Decompose requirements, implement, test, review, converge and write back | `clawcode/tui/builtin_slash.py`, `docs/CLAWTEAM_SLASH_GUIDE.md` |
 | Computer use (OS-level) | With `desktop.enabled`, `desktop_*` tools provide screenshots, mouse, and keyboard automation; complements `browser_*` | `desktop_screenshot`, `desktop_click`, `desktop_type`, `desktop_key`, `/doctor` | Cross-app actions, desktop checks, GUI-assisted verification | `docs/DESKTOP_TOOLS.md`, `docs/CLAW_MODE.md` (Desktop tools) |
@@ -110,7 +133,7 @@ cd clawcode
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
-clawcode
+python -m clawcode -c "[your project dir]"
 ```
 
 ---
@@ -321,7 +344,7 @@ ClawCode is not trying to replace every tool. It uses **alignment as a migration
 
 ---
 
-## Pro development: slash commands & skills
+## Pro development: slash commands & tools & skills
 
 Beyond migration-friendly defaults, ClawCode ships **built-in pro workflows**: common multi-step flows as `/slash` commands, with **skills** to encode team practice.
 
@@ -339,7 +362,10 @@ Beyond migration-friendly defaults, ClawCode ships **built-in pro workflows**: c
 
 > Full list: `clawcode/tui/builtin_slash.py`. Deep dives: `docs/CLAWTEAM_SLASH_GUIDE.md`, `docs/ARCHITECT_SLASH_GUIDE.md`, `docs/MULTI_PLAN_SLASH_GUIDE.md`.
 
-### 2) Bundled skills (reusable expertise)
+### 3) Built-in tools
+<img width="1376" height="768" alt="Generated_image_tools_stat" src="https://github.com/user-attachments/assets/994996bb-9bec-42fd-925f-4647fa2546b8" />
+
+### 3) Bundled skills (reusable expertise)
 
 | Category | Examples | Delivery value |
 |---|---|---|
@@ -355,6 +381,7 @@ Beyond migration-friendly defaults, ClawCode ships **built-in pro workflows**: c
 > Suggested flow: frame execution with `/clawteam` or `/multi-plan`, then layer domain skills for consistency.
 
 ---
+
 
 ## Quick start
 
