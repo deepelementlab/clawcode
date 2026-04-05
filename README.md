@@ -23,21 +23,23 @@
 
 ClawCode is a Claude Code‑inspired implementation in Python and Rust, focused on agents and experience‑based evolution. It is also an open‑source coding‑agent CLI for Anthropic, OpenAI, Gemini, DeepSeek, GLM, Kimi, Ollama, Codex, GitHub Models, and 200+ models via OpenAI‑compatible APIs.
 
-We hope to make it an open and excellent creative development tool – a useful AI programming Swiss Army knife in your hands.
-
-The foundation is the coder agent framework: tool‑use, skills, memory, and multi‑agent coordination. On this basis, we further expanded and built the claw framework, which supports integration of more tools, compatibility with OpenClaw skill applications, and extended computer‑usage capabilities. This is meant to meet future, more omplex and diverse work (similar to cowork, but we focus more on development tasks – though this part still needs improvement).
-
-But these alone may not be enough. In our own projects and usage processes, we generate a lot of development data. That data goes through multiple iterations and decision‑making processes, gradually converging. We believe this data is valuable, and it would be a pity if it were only used as nourishment (or feedback) for large model companies.
-
-Therefore, we attempt to build an evolving subsystem that uses this data to continuously improve the performance of the agents mentioned above. All this data and related information is stored locally and will never leave your control. Moreover, the system is fully open source, auditable, and has no hidden telemetry or data collection.
-
-Simply put, we introduce an algorithm framework driven by experience‑based autonomous reinforcement learning. It turns the following process:
-
-idea → memory → plan → code → verify → review → learned experience
-
-into an executable, learnable, and evolving engineering loop.
-
 <img width="2549" height="930" alt="ClawCode screenshot" src="https://github.com/user-attachments/assets/6cc0814a-aa3e-4f56-98dc-5123ecf88a1c" />
+
+We aim to build an open, excellent AI coding Swiss Army knife.
+
+It starts with a coder agent framework (tool use, skills, memory, multi‑agent). On this we built Claw, adding more tools, OpenClaw skill compatibility, and computer‑use abilities.
+
+But that's not enough. Our own projects generate valuable development data through iterations. We don't want to give it away as free feedback to big model companies.
+
+So we built a self‑improving subsystem: it uses that data to continuously enhance the agents. All data stays local, under your control. The system is open source, auditable, with no hidden telemetry.
+
+In short: an experience‑based reinforcement learning framework that turns
+
+Idea → Memory → Plan → Code → Verify → Review → Learned Experience
+
+into an executable, learnable, evolving engineering loop.
+
+
 
 
 ---
@@ -58,7 +60,6 @@ into an executable, learnable, and evolving engineering loop.
 - [Configuration & capability switches](#configuration--capability-switches)
 - [Tiered onboarding](#tiered-onboarding)
 - [High-value scenarios](#high-value-scenarios)
-- [Documentation index](#documentation-index)
 - [What’s New](#whats-new)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
@@ -333,7 +334,8 @@ ClawCode treats **experience** as a first-class artifact—not only conclusions,
 | Deeploop write-back | Structured rounds + `DEEP_LOOP_WRITEBACK_JSON` + finalize | `/clawteam --deep_loop`, `/clawteam-deeploop-finalize` | Pending session metadata + `LearningService` path | `docs/CLAWTEAM_SLASH_GUIDE.md` |
 | Governance & migration | Privacy tiers, redaction, feedback scores, compatibility | `--privacy`, `--v1-compatible`, `--strategy`, `--explain` | Audit snapshots; export wrappers (`schema_meta`, `quality_score`, …) | `docs/ECAP_v2_USER_GUIDE.md`, `docs/TECAP_v2_UPGRADE.md` |
 
-#### Closed-loop evolution (implementation view)
+
+#### ClawCode is not trying to replace every tool. (implementation view)
 
 ```mermaid
 flowchart LR
@@ -466,7 +468,21 @@ Beyond migration-friendly defaults, ClawCode ships **built-in pro workflows**: c
 > Full list: `clawcode/tui/builtin_slash.py`. Deep dives: `docs/CLAWTEAM_SLASH_GUIDE.md`, `docs/ARCHITECT_SLASH_GUIDE.md`, `docs/MULTI_PLAN_SLASH_GUIDE.md`.
 
 ### 3) Built-in tools
-<img width="1376" height="768" alt="Generated_image_tools_stat" src="https://github.com/user-attachments/assets/994996bb-9bec-42fd-925f-4647fa2546b8" />
+### 🔧 Tools (44 max)
+| Category | Tools | Description |
+| --- | --- | --- |
+| File I/O | `view`, `ls`, `write`, `edit`, `patch`, `glob`, `grep`, `fetch` | Read, list, mutate, and search files in the workspace with permission checks |
+| Shell & execution | `bash`, `terminal`, `process`, `execute_code` | Shell commands, PTY sessions, process control, and controlled code execution |
+| Search & diagnostics | `diagnostics`, `web_search`, `web_extract`, `session_search` | LSP diagnostics, web search/extract, and in-session message search |
+| Browser | `browser_*` (×11) | Local browser automation (registered when browser requirements pass) |
+| Agent | `Agent` | Spawn sub-agents with a filtered tool set (no nested delegation tools) |
+| Task & state | `TodoWrite`, `TodoRead`, `UpdateProjectState` | Persistent todos and project memo injected into future sessions |
+| Schedule | `cronjob` | Scheduled and deferred job entrypoint |
+| Skills & memory | `memory`, `skills_list`, `skill_view`, `skill_manage`, `experience_evolve_to_skills` | Durable memory and skill listing, inspection, management, and evolution |
+| Optional integrations | `mcp_call`, `sourcegraph`, `desktop_screenshot`, `desktop_move`, `desktop_click`, `desktop_type`, `desktop_key` | MCP proxy, Sourcegraph search, and desktop automation when configured and requirements pass |
+
+**Notes:** **44** is the maximum number of distinct built-in tool registrations from `get_builtin_tools()` (all optional rows active). A typical setup loads **37** (includes `browser_*` when requirements pass and always includes `web_search` / `web_extract`). MCP servers add more tool names at runtime.
+
 
 ### 3) Bundled skills (reusable expertise)
 
@@ -586,19 +602,6 @@ Typical knobs:
 
 ---
 
-## Documentation index
-
-| Topic | Path |
-|------|------|
-| `/clawteam` & `deep_loop` | `docs/CLAWTEAM_SLASH_GUIDE.md` |
-| ECAP v2 | `docs/ECAP_v2_USER_GUIDE.md` |
-| TECAP v1→v2 | `docs/TECAP_v2_UPGRADE.md` |
-| Architecture (layers & modules) | `docs/技术架构详细说明.md` |
-| Project overview | `docs/项目详细介绍.md` |
-| Optional dependencies / extras | `pyproject.toml` (`optional-dependencies`) |
-| Docs index (Chinese) | `docs/README.zh.md` |
-
----
 
 ## What’s New
 
