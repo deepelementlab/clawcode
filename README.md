@@ -21,15 +21,27 @@
   <a href="README.zh.md">简体中文</a> 
 </p>
 
+<p align="center">
+  <a href="#Philosophy">Philosophy</a> •
+  <a href="#product vision">Product vision</a> •
+  <a href="#development assistance functions">Development assistance functions</a> •
+  <a href="#system Architecture">System Architecture</a> •
+  <a href="#value at a glance">Value at a glance</a> •
+  <a href="#Get started">Get started</a>
+</p>
+
+
 ClawCode is a Claude Code‑inspired implementation in Python and Rust, focused on agents and experience‑based evolution. It is also an open‑source coding‑agent CLI for Anthropic, OpenAI, Gemini, DeepSeek, GLM, Kimi, Ollama, Codex, GitHub Models, and 200+ models via OpenAI‑compatible APIs.
 
 <img width="2549" height="930" alt="ClawCode screenshot" src="https://github.com/user-attachments/assets/6cc0814a-aa3e-4f56-98dc-5123ecf88a1c" />
+
+## Philosophy
 
 We aim to build an open, excellent AI coding Swiss Army knife.
 
 It starts with a coder agent framework (tool use, skills, memory, multi‑agent). On this we built Claw, adding more tools, OpenClaw skill compatibility, and computer‑use abilities.
 
-But that's not enough. Our own projects generate valuable development data through iterations. We don't want to give it away as free feedback to big model companies.
+But that's not enough. Our own projects generate valuable development data through iterations. We shouldn't waste them.
 
 So we built a self‑improving subsystem: it uses that data to continuously enhance the agents. All data stays local, under your control. The system is open source, auditable, with no hidden telemetry.
 
@@ -44,37 +56,13 @@ into an executable, learnable, evolving engineering loop.
 
 ---
 
-## Table of contents
-
-- [What is ClawCode?](#what-is-clawcode)
-- [Product vision](#product-vision)
-- [Value at a glance](#value-at-a-glance)
-- [Who it’s for / Get started](#whos-it-for--get-started)
-- [Capability matrix (definition–problem–value–entry)](#capability-matrix-definitionproblemvalueentry)
-- [Full-stack development loop (diagram)](#full-stack-development-loop-diagram)
-- [Master–slave agent architecture (diagram)](#masterslave-agent-architecture-diagram)
-- [How ClawCode compares](#how-clawcode-compares)
-- [Alignment with Claude Code (workflow migration)](#alignment-with-claude-code-workflow-migration)
-- [Pro development: slash commands & skills](#pro-development-slash-commands--skills)
-- [Quick start](#quick-start)
-- [Configuration & capability switches](#configuration--capability-switches)
-- [Tiered onboarding](#tiered-onboarding)
-- [High-value scenarios](#high-value-scenarios)
-- [What’s New](#whats-new)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
-
----
-
 ## Product vision
 
-ClawCode is a creative dev tool aimed at real delivery. Core motivations:
-
+ClawCode is a creative dev tool aimed at real delivery. 
+Features:
 <img width="1376" height="768" alt="Generated_image" src="https://github.com/user-attachments/assets/1a09bd15-9859-413d-a1f3-f0c573e12b99" />
 
-
+Core motivations:
 - **Turn ideas into runnable code quickly**  
   From “I have an idea” to “implemented and verified,” with less context switching and tool friction.
 
@@ -91,6 +79,24 @@ ClawCode is a creative dev tool aimed at real delivery. Core motivations:
   Beyond one-off codegen: planning, delegation, execution, verification, review, and structured learning.
 
 ## Development assistance functions
+
+### Architecture & review
+
+| Command | Function |
+|--------|----------|
+| `/architect` | Run architecture design/review workflow with trade-off analysis and ADR/checklist options. |
+| `/code-review` | Review local uncommitted changes with severity-ranked findings and commit gate. |
+| `/security-review` | Complete a security review of the pending changes on the current branch. |
+| `/review` | Review a pull request. |
+
+### Autocomplete / related planning & plugins
+
+| Command | Function |
+|--------|----------|
+| `/plan` | Enable plan mode or view the current session plan (handled in ChatScreen; listed for autocomplete). |
+| `/arc-plan` | Generate a one-shot alternative implementation plan (ARC planner). |
+| `/plugin` | Manage clawcode plugins. |
+
 ### Multi-role orchestration & engineering workflows
 
 | Command | Function |
@@ -103,15 +109,6 @@ ClawCode is a creative dev tool aimed at real delivery. Core motivations:
 | `/multi-frontend` | Run frontend-focused multi-model workflow (UI/UX led, orchestrator writes code). |
 | `/multi-workflow` | Run full-stack multi-model workflow (backend + UI advisors, orchestrator writes code). |
 | `/orchestrate` | Run sequential multi-role workflow (HANDOFF between planner/TDD/review/security/architect); `/orchestrate show\|list`. |
-
-### Architecture & review
-
-| Command | Function |
-|--------|----------|
-| `/architect` | Run architecture design/review workflow with trade-off analysis and ADR/checklist options. |
-| `/code-review` | Review local uncommitted changes with severity-ranked findings and commit gate. |
-| `/security-review` | Complete a security review of the pending changes on the current branch. |
-| `/review` | Review a pull request. |
 
 ### Test-driven development
 
@@ -186,14 +183,6 @@ ClawCode is a creative dev tool aimed at real delivery. Core motivations:
 | `/memory` | Edit claw memory files. |
 | `/pr-comments` | Get comments from a GitHub pull request. |
 
-### Autocomplete / related planning & plugins
-
-| Command | Function |
-|--------|----------|
-| `/plan` | Enable plan mode or view the current session plan (handled in ChatScreen; listed for autocomplete). |
-| `/arc-plan` | Generate a one-shot alternative implementation plan (ARC planner). |
-| `/plugin` | Manage clawcode plugins. |
-
 ## System Architecture
 <img width="1376" height="768" alt="Generated_image_architecture" src="https://github.com/user-attachments/assets/1bd96e39-8ca3-4e96-8698-dbc755ce94ab" />
 
@@ -255,7 +244,7 @@ That is why ClawCode combines **terminal execution + team orchestration + experi
 - Teams that need multi-role collaboration, governable flows, and reviewable outputs.
 - Leads who care about **long-term outcomes**, not a single answer.
 
-### Get started
+## Get started
 
 ```bash
 cd clawcode
@@ -310,7 +299,10 @@ Short aliases (e.g. `qa`, `sre`, `product-manager`) map to the `clawteam-*` role
 
 ### 3) `clawteam` deeploop: convergent closed-loop iteration
 
+Simulates the real‑world iterative development process of a project team, enabling deep collaborative development (this feature is still under improvement).
+
 `/clawteam --deep_loop` runs multiple converging rounds—not “one pass and done.”
+
 <img width="1938" height="380" alt="Screenshot - 2026-03-30 18 39 08" src="https://github.com/user-attachments/assets/656adcf5-0cb0-457b-b990-c09a54837920" />
 
 - Structured contract per round (goals, handoffs, gaps, …)
@@ -322,6 +314,7 @@ Short aliases (e.g. `qa`, `sre`, `product-manager`) map to the `clawteam-*` role
 ### 4) ECAP Closed-loop learning: 
 
 ClawCode treats **experience** as a first-class artifact—not only conclusions, but **portable structure**:
+
 <img width="2730" height="1535" alt="ECAP技术示例" src="https://github.com/user-attachments/assets/480acf50-946f-44a1-8a06-d3254f0834f9" />
 
 - **Experience:** An experience function representing the gap between a goal and its outcome. It is a learnable function extracted from the process of resolving the goal–outcome gap, using that gap as the driver for improvement. The dimensional experience objects include: model_experience, agent_experience, skill_experience, and team_experience.
