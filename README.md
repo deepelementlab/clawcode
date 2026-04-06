@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/deepelementlab/clawcode/releases">
    <img
-     src="https://img.shields.io/static/v1?style=flat&label=release&labelColor=6A737D&color=fe7d37&message=v0.1.0"
+     src="https://img.shields.io/static/v1?style=flat&label=release&labelColor=6A737D&color=fe7d37&message=v0.1.1"
      alt="Release v0.1.1"
    />
   </a>
