@@ -67,3 +67,6 @@ class HudState:
     agent_entries: List[HudAgentEntry] = field(default_factory=list)
     todos: List[HudTodoItem] = field(default_factory=list)
 
+    # Non-empty when a clawteam deep_loop is active; rendered on row 5 (overrides todos row).
+    deep_loop_status: str = ""
+

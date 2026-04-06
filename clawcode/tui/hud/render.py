@@ -184,6 +184,25 @@ def _render_todos_line(todos: List[HudTodoItem], colors: HudColors) -> str | Non
     return f"[{colors.todo_bullet}]▸[/] {content} [dim]({completed}/{total})[/]"
 
 
+def _render_deep_loop_line(deep_loop_status: str, colors: HudColors) -> str:
+    """Render an active deep_loop status row with Rich markup.
+
+    The raw *deep_loop_status* string is built in ChatScreen._update_status_bars
+    and already contains the key information (iter, max, idle, stall).  Here we
+    apply colours so it stands out from the surrounding HUD rows.
+
+    Example outputs:
+        ◐ [深度循环] 迭代 3/10 | 运行中
+        ○ [深度循环] 迭代 3/10 | 等待 12s
+        ⟳ [深度循环] 迭代 4/10 | 自动恢复×1 | 等待 5s
+    """
+    if not deep_loop_status:
+        return ""
+    escaped = _escape_rich_markup(deep_loop_status)
+    # Highlight the status line using the agent_type color so it is visually distinct.
+    return f"[{colors.agent_type}]{escaped}[/]"
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -216,8 +235,12 @@ def render_hud(state: HudState, *, now: float = 0.0, colors: HudColors | None = 
         agent_lines.append("")
     lines.extend(agent_lines)
 
-    todos = _render_todos_line(state.todos, c)
-    lines.append(todos or "")
+    # Row 5: deep_loop status takes priority over todos when a loop is active.
+    if state.deep_loop_status:
+        lines.append(_render_deep_loop_line(state.deep_loop_status, c))
+    else:
+        todos = _render_todos_line(state.todos, c)
+        lines.append(todos or "")
 
     while len(lines) < 5:
         lines.append("")

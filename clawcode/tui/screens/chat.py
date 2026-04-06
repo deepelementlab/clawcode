@@ -170,15 +170,23 @@ def _parse_clawteam_namespace_slash(raw_text: str) -> tuple[str, str] | None:
     return head, tail.strip() if sep else ""
 
 
-def _extract_deep_loop_eval(text: str) -> tuple[bool, float | None]:
-    """Parse deep loop convergence signal from assistant text."""
+def _extract_deep_loop_eval(text: str) -> tuple[bool, float | None, bool]:
+    """Parse deep loop convergence signal from assistant text.
+
+    Returns:
+        (converged, delta_score, has_eval_marker) where *has_eval_marker* is True
+        when the assistant actually produced a ``DEEP_LOOP_EVAL_JSON:`` line (even if
+        the payload was malformed).  Callers use this flag to detect when the model
+        silently dropped the eval contract.
+    """
     raw = str(text or "")
     marker = "DEEP_LOOP_EVAL_JSON:"
     converged: bool | None = None
     delta_score: float | None = None
 
     pos = raw.rfind(marker)
-    if pos >= 0:
+    has_eval_marker = pos >= 0
+    if has_eval_marker:
         payload = raw[pos + len(marker) :].strip()
         line = payload.splitlines()[0].strip() if payload else ""
         if line:
@@ -221,7 +229,7 @@ def _extract_deep_loop_eval(text: str) -> tuple[bool, float | None]:
                 delta_score = float(m_d.group(1))
             except Exception:
                 delta_score = None
-    return bool(converged), delta_score
+    return bool(converged), delta_score, has_eval_marker
 
 
 def _hud_project_hint(hud_dir: str) -> str:
@@ -330,6 +338,11 @@ class ChatScreen(Screen):
     _RIGHT_PANEL_MIN_W = 24
     _RIGHT_PANEL_MAX_W = 90
 
+    # Deep-loop background monitor
+    _DEEP_LOOP_MONITOR_INTERVAL_S = 30.0   # watchdog check frequency
+    _DEEP_LOOP_STALL_TIMEOUT_S    = 180.0  # idle seconds before treating loop as stalled
+    _DEEP_LOOP_MAX_STALLS         = 5      # max auto-restart attempts before giving up
+
     BINDINGS = [
         ("f1", "show_help", "Help"),
         ("question_mark", "show_help", "Help"),
@@ -369,6 +382,7 @@ class ChatScreen(Screen):
         self._plan_state: dict[str, PlanSessionState] = {}
         self._plan_store: Any = None
         self._processing_timer = None
+        self._deep_loop_monitor_timer = None  # dedicated monitor; runs between iterations
         self._last_build_watchdog_check: float = 0.0
         self._last_plan_panel_refresh_at: float = 0.0
         self._switch_generation = 0
@@ -1425,6 +1439,21 @@ class ChatScreen(Screen):
             except Exception:
                 pass
 
+            # Build deep_loop HUD status string when a loop is active.
+            deep_loop_status = ""
+            _dl = self._clawteam_loop_store().get(self.current_session_id or "")
+            if isinstance(_dl, dict):
+                dl_iter  = int(_dl.get("iter_idx", 1) or 1)
+                dl_max   = int(_dl.get("max_iters", 100) or 100)
+                dl_stall = int(_dl.get("stall_count", 0) or 0)
+                dl_last  = float(_dl.get("last_activity_at") or 0.0)
+                idle_s   = max(0.0, time.monotonic() - dl_last) if dl_last else 0.0
+                is_running = run_state is not None and run_state.is_processing
+                icon = "◐" if is_running else "○"
+                stall_suffix = f" | 自动恢复×{dl_stall}" if dl_stall > 0 else ""
+                idle_suffix  = "" if is_running else f" | 等待 {int(idle_s)}s"
+                deep_loop_status = f"{icon} 深度循环 迭代 {dl_iter}/{dl_max}{stall_suffix}{idle_suffix}"
+
             state = HudState(
                 model=model,
                 context_percent=context_percent,
@@ -1436,6 +1465,7 @@ class ChatScreen(Screen):
                 running_tools=list(self._hud_running_tools.values()),
                 agent_entries=agent_entries,
                 todos=list(self._hud_todos),
+                deep_loop_status=deep_loop_status,
             )
             from ..hud.render import HudColors
             from ..styles.display_mode_styles import resolve_chrome
@@ -1552,6 +1582,74 @@ class ChatScreen(Screen):
         for state in self._session_runs.values():
             state.spinner_frame = 0
         self._update_status_bars()
+
+    # ------------------------------------------------------------------
+    # Deep-loop background monitor
+    # ------------------------------------------------------------------
+
+    def _start_deep_loop_monitor(self) -> None:
+        """Start the dedicated deep_loop watchdog timer (idempotent)."""
+        if self._deep_loop_monitor_timer is not None:
+            return
+        self._deep_loop_monitor_timer = self.set_interval(
+            self._DEEP_LOOP_MONITOR_INTERVAL_S, self._run_deep_loop_watchdog
+        )
+
+    def _stop_deep_loop_monitor(self) -> None:
+        """Stop the deep_loop watchdog timer only when no loops remain active."""
+        if self._deep_loop_monitor_timer is None:
+            return
+        if self._clawteam_deep_loop_state:
+            return  # other sessions still have active loops
+        try:
+            self._deep_loop_monitor_timer.stop()
+        except Exception:
+            pass
+        self._deep_loop_monitor_timer = None
+
+    def _run_deep_loop_watchdog(self) -> None:
+        """Periodic watchdog: detect stalled deep_loops and auto-restart them.
+
+        Called every _DEEP_LOOP_MONITOR_INTERVAL_S seconds by the dedicated timer.
+        For each active deep_loop session:
+        - If the agent is still running, update last_activity_at and skip.
+        - If the loop has been idle longer than _DEEP_LOOP_STALL_TIMEOUT_S and the
+          agent is NOT processing, treat the loop as stalled.
+        - Auto-restart up to _DEEP_LOOP_MAX_STALLS times; give up thereafter.
+        """
+        now = time.monotonic()
+        for sid, state in list(self._clawteam_deep_loop_state.items()):
+            if not isinstance(state, dict):
+                continue
+            run_state = self._get_run_state(sid, create=False)
+            if run_state is not None and run_state.is_processing:
+                # Agent is actively running this session's iteration; not stalled.
+                state["last_activity_at"] = now
+                continue
+            last_activity = float(state.get("last_activity_at") or 0.0)
+            idle_s = (now - last_activity) if last_activity else 0.0
+            if idle_s < self._DEEP_LOOP_STALL_TIMEOUT_S:
+                continue
+            # Loop appears stalled.
+            stall_count = int(state.get("stall_count", 0) or 0)
+            if stall_count >= self._DEEP_LOOP_MAX_STALLS:
+                self._append_clawteam_deep_loop_log(
+                    sid,
+                    f"[clawteam deep_loop] 自动恢复已达上限（{stall_count} 次），放弃循环。",
+                )
+                self._clawteam_loop_store().pop(sid, None)
+                self._clawteam_last_response_store().pop(sid, None)
+                self._stop_deep_loop_monitor()
+                continue
+            state["stall_count"] = stall_count + 1
+            state["last_activity_at"] = now  # reset to avoid re-triggering next tick
+            self._append_clawteam_deep_loop_log(
+                sid,
+                f"[clawteam deep_loop] 检测到循环中断（闲置 {int(idle_s)}s），"
+                f"自动恢复第 {stall_count + 1}/{self._DEEP_LOOP_MAX_STALLS} 次。",
+            )
+            self._continue_clawteam_deep_loop_if_needed(sid)
+        self._update_status_bars()  # refresh HUD idle counter
 
     async def switch_session(self, session_id: str) -> None:
         """Switch to another session and load its messages."""
@@ -2712,6 +2810,13 @@ class ChatScreen(Screen):
             i += 1
         return deep_loop, max_iters
 
+    # Maximum chars of previous-iteration output to embed in the continuation prompt.
+    # Keeps the runtime prompt bounded so it doesn't overflow the model context window.
+    _DEEP_LOOP_LAST_TEXT_CAP = 4000
+    # After this many consecutive iterations without a DEEP_LOOP_EVAL_JSON marker
+    # from the model, the loop auto-exits to prevent a runaway 100-iteration cycle.
+    _DEEP_LOOP_MAX_NO_EVAL = 3
+
     def _continue_clawteam_deep_loop_if_needed(self, session_id: str) -> None:
         sid = (session_id or "").strip()
         if not sid:
@@ -2726,13 +2831,28 @@ class ChatScreen(Screen):
         max_iters = int(state.get("max_iters", 100) or 100)
         min_iters = int(state.get("min_iters", 2) or 2)
         last_text = self._clawteam_last_response_store().get(sid, "")
-        converged, delta_score = _extract_deep_loop_eval(last_text)
+        converged, delta_score, has_eval_marker = _extract_deep_loop_eval(last_text)
+
+        # --- Track consecutive missing DEEP_LOOP_EVAL_JSON ---
+        no_eval_count = int(state.get("no_eval_count", 0) or 0)
+        if has_eval_marker:
+            no_eval_count = 0
+        else:
+            no_eval_count += 1
+        state["no_eval_count"] = no_eval_count
+
         delta_text = f"{delta_score:.4f}" if isinstance(delta_score, float) else "unknown"
         self._append_clawteam_deep_loop_log(
             sid,
             f"[clawteam deep_loop] 迭代 {iter_idx}/{max_iters} 收敛判定："
-            f" converged={str(converged).lower()} · delta_score={delta_text}",
+            f" converged={str(converged).lower()} · delta_score={delta_text}"
+            + (f" · no_eval={no_eval_count}" if not has_eval_marker else ""),
         )
+
+        # Ensure the background monitor is running for this loop.
+        self._start_deep_loop_monitor()
+
+        # --- Termination checks ---
         if iter_idx >= max_iters:
             self._append_clawteam_deep_loop_log(
                 sid,
@@ -2740,6 +2860,7 @@ class ChatScreen(Screen):
             )
             self._clawteam_loop_store().pop(sid, None)
             self._clawteam_last_response_store().pop(sid, None)
+            self._stop_deep_loop_monitor()
             return
         if converged and iter_idx >= min_iters:
             self._append_clawteam_deep_loop_log(
@@ -2748,14 +2869,33 @@ class ChatScreen(Screen):
             )
             self._clawteam_loop_store().pop(sid, None)
             self._clawteam_last_response_store().pop(sid, None)
+            self._stop_deep_loop_monitor()
+            return
+        if no_eval_count >= self._DEEP_LOOP_MAX_NO_EVAL:
+            self._append_clawteam_deep_loop_log(
+                sid,
+                f"[clawteam deep_loop] 结束：连续 {no_eval_count} 轮未输出 DEEP_LOOP_EVAL_JSON，"
+                "视为软收敛退出。请检查模型是否支持输出所需的 eval 格式。",
+            )
+            self._clawteam_loop_store().pop(sid, None)
+            self._clawteam_last_response_store().pop(sid, None)
+            self._stop_deep_loop_monitor()
             return
 
+        # --- Prepare next iteration ---
         next_iter = iter_idx + 1
         state["iter_idx"] = next_iter
-        self._append_clawteam_deep_loop_log(
-            sid,
-            f"[clawteam deep_loop] 迭代 {next_iter}/{max_iters} 开始",
-        )
+        state["last_activity_at"] = time.monotonic()  # mark activity for watchdog
+
+        # Truncate previous output to keep the prompt within context window bounds.
+        prev_output = last_text
+        if len(prev_output) > self._DEEP_LOOP_LAST_TEXT_CAP:
+            omitted = len(prev_output) - self._DEEP_LOOP_LAST_TEXT_CAP
+            prev_output = (
+                f"[...前 {omitted} 字已省略，保留最新内容...]\n"
+                + prev_output[-self._DEEP_LOOP_LAST_TEXT_CAP:]
+            )
+
         base_prompt = str(state.get("base_prompt", "") or "")
         runtime_prompt = (
             f"{base_prompt}\n\n"
@@ -2764,11 +2904,11 @@ class ChatScreen(Screen):
             f"- Do NOT stop before iteration {min_iters}\n"
             "- Keep using clawteam protocol and produce DEEP_LOOP_EVAL_JSON at end.\n\n"
             "Previous iteration output (for continuation):\n"
-            f"{last_text}\n"
+            f"{prev_output}\n"
         )
         self._start_agent_run(
             session_id=sid,
-            display_content=f"迭代 {next_iter}/{max_iters}",
+            display_content=f"[深度循环] 迭代 {next_iter}/{max_iters}",
             content_for_agent=runtime_prompt,
             attachments=None,
             is_plan_run=False,
@@ -3042,12 +3182,12 @@ class ChatScreen(Screen):
                             "min_iters": 2,
                             "base_prompt": outcome.agent_user_text,
                             "requirement": tail,
+                            "no_eval_count": 0,
+                            "last_activity_at": time.monotonic(),
+                            "stall_count": 0,
                         }
                         self._clawteam_last_response_store().pop(sid_slash, None)
-                        self._append_clawteam_deep_loop_log(
-                            sid_slash,
-                            f"[clawteam deep_loop] 迭代 1/{deep_loop_max_iters} 开始",
-                        )
+                        self._start_deep_loop_monitor()
                     else:
                         self._clawteam_loop_store().pop(sid_slash, None)
                         self._clawteam_last_response_store().pop(sid_slash, None)
@@ -3523,6 +3663,12 @@ class ChatScreen(Screen):
                     message_list._agent_processing = False
                     message_list.force_final_refresh()
                     await asyncio.sleep(0)
+            # Continue deep_loop after the run lock is released (is_processing=False).
+            # The RESPONSE handler's call_later fires while is_processing is still True
+            # (due to asyncio.sleep(0) yield points), so this finally-based call is the
+            # reliable path — mirrors plan_task's _run_next_plan_task pattern below.
+            self.call_later(lambda sid=session_id: self._continue_clawteam_deep_loop_if_needed(sid))
+
             if build_idx_snapshot >= 0:
                 await self._recover_stale_plan_task_after_run(session_id, build_idx_snapshot)
                 # After run lock is released, continue the build queue (next task or retry).
@@ -3597,6 +3743,11 @@ class ChatScreen(Screen):
             if not is_visible_session:
                 self._mark_session_unread(session_id)
                 self._refresh_sidebar_async()
+
+        # Update deep_loop activity timestamp so the watchdog knows the loop is alive.
+        _dl_state = self._clawteam_loop_store().get(session_id)
+        if isinstance(_dl_state, dict):
+            _dl_state["last_activity_at"] = time.monotonic()
 
         match event.type:
             case AgentEventType.USAGE:
