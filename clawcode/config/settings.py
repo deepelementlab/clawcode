@@ -152,6 +152,15 @@ class LSPConfig(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
+class InputHistoryConfig(BaseModel):
+    """Persistent input history settings."""
+
+    enabled: bool = True
+    retention_days: float = 7.0
+    max_entries: int = 500
+    granularity: Literal["project", "global", "session"] = "project"
+
+
 class TUIConfig(BaseModel):
     """Terminal UI configuration."""
 
@@ -160,6 +169,7 @@ class TUIConfig(BaseModel):
     mouse_enabled: bool = True
     save_theme_preference: bool = True  # Save theme preference to disk
     external_editor: str = ""  # e.g. vim, nvim, or $EDITOR; empty = use default
+    input_history: InputHistoryConfig = Field(default_factory=InputHistoryConfig)
 
 
 class SourcegraphConfig(BaseModel):

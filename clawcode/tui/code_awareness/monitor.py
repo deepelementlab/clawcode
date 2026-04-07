@@ -13,6 +13,11 @@ from .classifier import classify_architecture_map
 from .mapping_store import load_architecture_map, save_architecture_map
 from .scanner import _should_ignore, collect_all_paths, scan_project
 from .state import ArchitectureMap, FileChangeEvent, ProjectTree
+from .symbol_index import (
+    collect_outline_candidate_paths,
+    derive_dir_role_hints,
+    outline_for_files,
+)
 
 
 class ArchitectureAwarenessMonitor:
@@ -26,12 +31,14 @@ class ArchitectureAwarenessMonitor:
         on_mapping: Callable[[ArchitectureMap, ProjectTree], None],
         on_file_event: Callable[[FileChangeEvent], None],
         max_depth: int = 4,
+        lsp_manager: object | None = None,
     ) -> None:
         self._wd = Path(working_directory).resolve()
         self._settings = settings
         self._on_mapping = on_mapping
         self._on_file_event = on_file_event
         self._max_depth = max_depth
+        self._lsp_manager = lsp_manager
         self._task: asyncio.Task[None] | None = None
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._current_map: ArchitectureMap | None = load_architecture_map(str(self._wd))
@@ -41,6 +48,7 @@ class ArchitectureAwarenessMonitor:
         self._consecutive_fallbacks = 0
         self._first_refresh_done = False
         self._last_classify_attempt_at = 0.0
+        self._last_symbol_refresh_at = 0.0
 
     @property
     def current_map(self) -> ArchitectureMap | None:
@@ -144,6 +152,41 @@ class ArchitectureAwarenessMonitor:
         self._current_map = new_map
         save_architecture_map(str(self._wd), new_map)
         self._on_mapping(new_map, tree)
+
+        now = time.time()
+        if now - self._last_symbol_refresh_at >= 15.0:
+            asyncio.ensure_future(self._refresh_symbols(directories))
+
+    async def _refresh_symbols(self, directories: list[str]) -> None:
+        """Background: collect file symbol outlines and dir role hints."""
+        try:
+            self._last_symbol_refresh_at = time.time()
+            candidates = await asyncio.to_thread(
+                collect_outline_candidate_paths, str(self._wd), max_depth=self._max_depth
+            )
+            if not candidates:
+                return
+
+            abs_paths = [str(self._wd / c) for c in candidates]
+            lsp_mgr = self._lsp_manager
+            use_lsp = lsp_mgr is not None
+            outlines = await outline_for_files(
+                abs_paths, str(self._wd),
+                use_lsp=use_lsp,
+                lsp_manager=lsp_mgr if use_lsp else None,
+            )
+
+            role_hints = derive_dir_role_hints(directories)
+
+            if self._current_map is not None:
+                self._current_map.file_symbol_outline.update(outlines)
+                for k, v in role_hints.items():
+                    if k not in self._current_map.dir_role_hints:
+                        self._current_map.dir_role_hints[k] = v
+                self._current_map.tech_map_updated_at = time.time()
+                save_architecture_map(str(self._wd), self._current_map)
+        except Exception:
+            pass
 
     def _snapshot_fs(self) -> tuple[set[str], dict[str, int]]:
         dirs: set[str] = set()

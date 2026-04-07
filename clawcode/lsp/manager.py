@@ -602,6 +602,17 @@ class LSPManager:
 
         return all_diagnostics
 
+    async def document_symbols(
+        self, file_path: str, *, timeout: float = 5.0
+    ) -> List[Dict[str, Any]]:
+        """Delegate textDocument/documentSymbol to the appropriate LSP client."""
+        client = await self.start_for_file(file_path)
+        if not client:
+            return []
+        if not client.is_file_open(file_path):
+            await client.open_file(file_path)
+        return await client.document_symbols(file_path, timeout=timeout)
+
     async def get_diagnostics_for_file(
         self, file_path: str, wait_time: float = 0.1
     ) -> List[Diagnostic]:

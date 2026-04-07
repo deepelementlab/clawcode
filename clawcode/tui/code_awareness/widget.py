@@ -140,6 +140,21 @@ class CodeAwarenessPanel(ScrollableContainer):
         self._refresh_content()
         return self._state.history_expanded
 
+    def toggle_focus_mode(self) -> bool:
+        """Toggle focus mode (show only files touched in current session). Returns new state."""
+        self._state.code_awareness_focus_mode = not self._state.code_awareness_focus_mode
+        if self._state.code_awareness_focus_mode:
+            self._state.focus_paths = set(self._state.modified_files) | set(self._state.read_files)
+        else:
+            self._state.focus_paths.clear()
+        self._refresh_content()
+        return self._state.code_awareness_focus_mode
+
+    def set_focus_paths(self, paths: set[str]) -> None:
+        """Explicitly set focus paths (e.g. from agent tool reads/writes)."""
+        self._state.focus_paths = {p.replace("\\", "/") for p in paths}
+        self._request_refresh()
+
     def restore_session_file_marks(
         self,
         *,

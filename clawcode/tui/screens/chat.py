@@ -42,6 +42,7 @@ from ..clawteam_deeploop_pending import (
 from ..code_awareness.monitor import ArchitectureAwarenessMonitor
 from ..code_awareness.widget import CodeAwarenessPanel
 from ..components.chat.claude_input import ClaudeCodeInput
+from ..components.chat.input_history_store import InputHistoryStore
 from ..components.chat.hud_bar import HudBar
 from ..components.chat.info_panel import InfoPanel, InfoPanelModel, format_lsp_lines
 from ..components.chat.input_area import MessageInput
@@ -394,6 +395,7 @@ class ChatScreen(Screen):
         self._session_completion_tokens: int = 0
         self._session_cost: float = 0.0
         self._code_awareness_monitor: ArchitectureAwarenessMonitor | None = None
+        self._input_history_store: InputHistoryStore | None = None
 
         # HUD (Claude-HUD-like bottom monitor)
         self._hud_counts: HudConfigCounts = HudConfigCounts()
@@ -528,6 +530,9 @@ class ChatScreen(Screen):
         if monitor is not None:
             asyncio.create_task(monitor.stop())
             self._code_awareness_monitor = None
+        if self._input_history_store is not None:
+            self._input_history_store.save()
+            self._input_history_store = None
 
     def _refresh_slash_skill_autocomplete(self) -> None:
         """Include plugin skill names (e.g. /api-design) in the `/` suggestion panel."""
@@ -1227,6 +1232,7 @@ class ChatScreen(Screen):
             await self._update_info_panel()
             self._refresh_slash_skill_autocomplete()
             await self._init_code_awareness()
+            self._init_input_history()
         except Exception as e:
             # Surface initialization errors both in UI and logs
             try:
@@ -2114,6 +2120,36 @@ class ChatScreen(Screen):
         "view", "View", "Read", "read",
     })
 
+    def _init_input_history(self) -> None:
+        """Create persistent input history store and bind it to the input widget."""
+        hist_cfg = getattr(getattr(self.settings, "tui", None), "input_history", None)
+        if hist_cfg is not None and not hist_cfg.enabled:
+            return
+        wd = getattr(self.settings, "working_directory", "") or ""
+        if not wd:
+            return
+        try:
+            granularity = getattr(hist_cfg, "granularity", "project") if hist_cfg else "project"
+            retention = getattr(hist_cfg, "retention_days", 7.0) if hist_cfg else 7.0
+            max_entries = getattr(hist_cfg, "max_entries", 500) if hist_cfg else 500
+            store = InputHistoryStore(
+                working_directory=wd,
+                granularity=granularity,
+                retention_days=retention,
+                max_entries=max_entries,
+            )
+            store.load()
+            store.prune_expired()
+            self._input_history_store = store
+
+            input_widget = self.query_one("#message_input_widget", MessageInput)
+            input_widget.bind_persistent_history(
+                store,
+                session_id=self.current_session_id or "",
+            )
+        except Exception:
+            pass
+
     async def _init_code_awareness(self) -> None:
         """Scan the project directory and initialise the Code Awareness panel."""
         try:
@@ -2159,12 +2195,15 @@ class ChatScreen(Screen):
             except Exception:
                 pass
 
+        lsp_mgr = getattr(self._app_context, "lsp_manager", None) if self._app_context else None
+
         try:
             monitor = ArchitectureAwarenessMonitor(
                 working_directory=wd,
                 settings=self.settings,
                 on_mapping=_on_mapping,
                 on_file_event=_on_file_event,
+                lsp_manager=lsp_mgr,
             )
             self._code_awareness_monitor = monitor
             if monitor.current_map is not None:

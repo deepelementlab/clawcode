@@ -9,12 +9,15 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from textual import events, on
 from textual.containers import Horizontal, Vertical
 from textual.widgets import TextArea, Static, Button
 from rich.text import Text
+
+if TYPE_CHECKING:
+    from .input_history_store import InputHistoryStore
 
 from ..dialogs.file_picker import FileAttachment
 from ...at_file_complete import (
@@ -33,7 +36,7 @@ from ...builtin_slash import (
 DEFAULT_INPUT_HELP_LINE = (
     "press enter to send the message, write \\ and enter to add a new line"
 )
-SLASH_INPUT_HELP_SUFFIX = " | / commands: tab · ↑↓ | @ file: tab · ↑↓"
+SLASH_INPUT_HELP_SUFFIX = " | / commands: tab · ↑↓ | @ file: tab · ↑↓ | Tab: autocomplete"
 
 # App-level actions while focus is in the input subtree (TextArea may swallow keys before App BINDINGS).
 # Help: Textual maps Ctrl+H (ASCII 8) to ``backspace``, same as the Backspace key — we cannot bind
@@ -390,6 +393,30 @@ class MessageInput(Static):
     MessageInput #at_suggest.at_suggest_hidden {
         display: none;
     }
+
+    MessageInput #ghost_hint {
+        height: auto;
+        max-height: 1;
+        padding: 0 1;
+        color: #555e6e;
+    }
+
+    MessageInput #ghost_hint.ghost_hidden {
+        display: none;
+    }
+
+    MessageInput #history_suggest {
+        height: auto;
+        max-height: 5;
+        padding: 0 1;
+        background: #151a24;
+        border-bottom: round #303949;
+        overflow-y: auto;
+    }
+
+    MessageInput #history_suggest.history_suggest_hidden {
+        display: none;
+    }
     """
 
     def __init__(self, **kwargs: Any) -> None:
@@ -410,6 +437,12 @@ class MessageInput(Static):
         self._history_browse_index: int = 0
         self._history_draft: str = ""
         self._history_applying: bool = False
+        self._persistent_history: InputHistoryStore | None = None
+        self._persistent_session_id: str = ""
+        self._ghost_text: str = ""
+        self._smart_suggestions: list[str] = []
+        self._smart_suggest_index: int = 0
+        self._smart_suggest_active: bool = False
         self._at_matches: list[tuple[str, str]] = []
         self._at_index: int = 0
         self._at_view_start: int = 0
@@ -425,10 +458,191 @@ class MessageInput(Static):
         if self._input_history and self._input_history[-1] == raw:
             return
         self._input_history.append(raw)
+        if self._persistent_history is not None:
+            self._persistent_history.push(raw, session_id=self._persistent_session_id)
+            self._persistent_history.save()
+
+    def bind_persistent_history(
+        self,
+        store: "InputHistoryStore",
+        *,
+        session_id: str = "",
+    ) -> None:
+        """Attach a persistent store and load saved entries into the in-memory deque."""
+        self._persistent_history = store
+        self._persistent_session_id = session_id
+        self._load_persistent_history()
+
+    def _load_persistent_history(self) -> None:
+        """Populate the in-memory deque from the persistent store."""
+        store = self._persistent_history
+        if store is None:
+            return
+        texts = store.get_texts(session_id=self._persistent_session_id)
+        self._input_history = deque(texts[-self.INPUT_HISTORY_MAX:], maxlen=self.INPUT_HISTORY_MAX)
+        self._reset_input_history_browse()
 
     def _reset_input_history_browse(self) -> None:
         self._history_browse_index = 0
         self._history_draft = ""
+
+    # ------------------------------------------------------------------
+    # Smart completion (history-based inline + panel)
+    # ------------------------------------------------------------------
+
+    def _update_smart_suggestions(self) -> None:
+        """Recompute inline ghost text and suggestion list from current input."""
+        store = self._persistent_history
+        if store is None:
+            self._dismiss_smart_suggestions()
+            return
+
+        try:
+            ta = self.query_one("#text_input", TextArea)
+        except Exception:
+            self._dismiss_smart_suggestions()
+            return
+
+        current = (ta.text or "").strip()
+        if not current or len(current) < 2:
+            self._dismiss_smart_suggestions()
+            return
+
+        if current.startswith("/") or current.startswith("@"):
+            self._dismiss_smart_suggestions()
+            return
+
+        if self._slash_panel_open() or self._at_panel_open():
+            self._dismiss_smart_suggestions()
+            return
+
+        if self._history_browse_index > 0:
+            self._dismiss_smart_suggestions()
+            return
+
+        inline = store.suggest_inline(current, session_id=self._persistent_session_id)
+        suggestions = store.suggest(current, session_id=self._persistent_session_id, limit=5)
+
+        self._ghost_text = inline
+        self._smart_suggestions = suggestions
+        self._smart_suggest_index = 0
+        self._smart_suggest_active = bool(inline or suggestions)
+
+        self._render_ghost_hint()
+        self._render_history_suggest_panel()
+
+    def _dismiss_smart_suggestions(self) -> None:
+        """Hide ghost text and suggestion panel."""
+        if not self._smart_suggest_active and not self._ghost_text:
+            return
+        self._ghost_text = ""
+        self._smart_suggestions = []
+        self._smart_suggest_index = 0
+        self._smart_suggest_active = False
+        self._render_ghost_hint()
+        self._render_history_suggest_panel()
+
+    def _render_ghost_hint(self) -> None:
+        """Update the inline ghost hint widget."""
+        try:
+            ghost = self.query_one("#ghost_hint", Static)
+        except Exception:
+            return
+        if self._ghost_text:
+            ghost.remove_class("ghost_hidden")
+            hint = Text()
+            display = self._ghost_text
+            if len(display) > 60:
+                display = display[:57] + "..."
+            hint.append(f"  ▸ {display}", style="dim #555e6e italic")
+            hint.append("  Tab ↹", style="dim #3d4b61")
+            ghost.update(hint)
+        else:
+            ghost.add_class("ghost_hidden")
+            ghost.update("")
+
+    def _render_history_suggest_panel(self) -> None:
+        """Update the history suggestion dropdown panel."""
+        try:
+            panel = self.query_one("#history_suggest", Static)
+        except Exception:
+            return
+        if not self._smart_suggestions or len(self._smart_suggestions) < 2:
+            panel.add_class("history_suggest_hidden")
+            panel.update("")
+            return
+
+        panel.remove_class("history_suggest_hidden")
+        lines: list[Text] = []
+        for i, text in enumerate(self._smart_suggestions[:5]):
+            line = Text()
+            display = text if len(text) <= 60 else text[:57] + "..."
+            selected = (i == self._smart_suggest_index)
+            if selected:
+                line.append("▸ ", style="bold cyan")
+                line.append(display, style="bold cyan")
+            else:
+                line.append("  ", style="dim")
+                line.append(display, style="dim #92a0b4")
+            lines.append(line)
+
+        combined = lines[0]
+        for line in lines[1:]:
+            combined = combined + Text("\n") + line
+        panel.update(combined)
+
+    def _accept_smart_suggestion(self) -> bool:
+        """Accept the current smart suggestion. Returns True if something was accepted."""
+        if not self._smart_suggest_active:
+            return False
+
+        try:
+            ta = self.query_one("#text_input", TextArea)
+        except Exception:
+            return False
+
+        if self._smart_suggestions and len(self._smart_suggestions) >= 2:
+            chosen = self._smart_suggestions[self._smart_suggest_index]
+        elif self._ghost_text:
+            current = (ta.text or "")
+            chosen = current + self._ghost_text
+        else:
+            return False
+
+        self._history_applying = True
+        try:
+            ta.text = chosen
+            self._cursor_to_end(ta)
+        finally:
+            self._history_applying = False
+        self._dismiss_smart_suggestions()
+        return True
+
+    def _accept_inline_ghost(self) -> bool:
+        """Accept only the inline ghost text (not the panel selection). Returns True if accepted."""
+        if not self._ghost_text:
+            return False
+        try:
+            ta = self.query_one("#text_input", TextArea)
+        except Exception:
+            return False
+        current = ta.text or ""
+        self._history_applying = True
+        try:
+            ta.text = current + self._ghost_text
+            self._cursor_to_end(ta)
+        finally:
+            self._history_applying = False
+        self._dismiss_smart_suggestions()
+        return True
+
+    def _smart_suggest_navigate(self, direction: int) -> None:
+        """Move selection in the suggestion panel by *direction* (+1 or -1)."""
+        if not self._smart_suggestions or len(self._smart_suggestions) < 2:
+            return
+        n = len(self._smart_suggestions)
+        self._smart_suggest_index = (self._smart_suggest_index + direction) % n
+        self._render_history_suggest_panel()
 
     def _cursor_to_end(self, text_input: TextArea) -> None:
         lines = (text_input.text or "").split("\n")
@@ -494,11 +708,13 @@ class MessageInput(Static):
         yield AttachmentList(id="attachment_list")
         yield AtSuggestStatic("", id="at_suggest", classes="at_suggest_hidden")
         yield SlashSuggestStatic("", id="slash_suggest", classes="slash_suggest_hidden")
+        yield Static("", id="history_suggest", classes="history_suggest_hidden")
         yield PasteAwareTextArea(
             id="text_input",
             soft_wrap=True,
             classes="input_textarea",
         )
+        yield Static("", id="ghost_hint", classes="ghost_hidden")
         yield Static(
             DEFAULT_INPUT_HELP_LINE,
             classes="input_help",
@@ -518,6 +734,8 @@ class MessageInput(Static):
             self._history_browse_index = 0
             self._history_draft = ""
         self._sync_completion_panels()
+        if not self._history_applying:
+            self._update_smart_suggestions()
 
     def _get_working_directory_path(self) -> Path:
         try:
@@ -814,6 +1032,7 @@ class MessageInput(Static):
     def clear(self) -> None:
         """Clear the input and attachments."""
         self._reset_input_history_browse()
+        self._dismiss_smart_suggestions()
         self.text = ""
         self.clear_attachments()
         self._sync_slash_panel()
@@ -881,6 +1100,41 @@ class MessageInput(Static):
                 self._at_index = (self._at_index + 1) % len(self._at_matches)
                 self._sync_completion_panels()
                 return
+
+        # Smart completion: Tab accepts, Right accepts inline, Esc dismisses
+        if self._smart_suggest_active and self._vim_mode == "insert":
+            if event.key == "tab":
+                event.stop()
+                self._accept_smart_suggestion()
+                return
+            if event.key == "right" and self._ghost_text:
+                cursor = getattr(text_input, "cursor_location", (0, 0))
+                lines = (text_input.text or "").split("\n")
+                row, col = cursor
+                at_end = (row == len(lines) - 1 and col >= len(lines[row]))
+                if at_end:
+                    event.stop()
+                    self._accept_inline_ghost()
+                    return
+            if event.key == "escape":
+                event.stop()
+                self._dismiss_smart_suggestions()
+                return
+
+        # Smart suggestion panel navigation (when panel has >=2 items)
+        if (
+            self._smart_suggest_active
+            and self._smart_suggestions
+            and len(self._smart_suggestions) >= 2
+            and self._vim_mode == "insert"
+            and event.key in ("ctrl+n", "ctrl+p")
+        ):
+            event.stop()
+            if event.key == "ctrl+n":
+                self._smart_suggest_navigate(1)
+            else:
+                self._smart_suggest_navigate(-1)
+            return
 
         if _dispatch_app_global_shortcut(event, getattr(self, "app", None)):
             return
@@ -957,9 +1211,10 @@ class MessageInput(Static):
             self.action_file_picker()
             return
 
-        # Esc -> normal mode
+        # Esc -> dismiss suggestions first, then normal mode
         if event.key == "esc":
             event.stop()
+            self._dismiss_smart_suggestions()
             self._vim_mode = "normal"
             self._exit_insert_mode()
             self._update_mode_hint()

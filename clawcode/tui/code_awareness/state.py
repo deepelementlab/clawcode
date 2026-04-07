@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Set
 
+# Bump when persisted architecture_map.json schema changes (see mapping_store).
+ARCHITECTURE_MAP_VERSION = 2
+
 
 class ArchLayer(Enum):
     """Architectural role of a directory."""
@@ -79,6 +82,8 @@ class CodeAwarenessState:
     session_turn_counter: Dict[str, int] = field(default_factory=dict)
     architecture_map: "ArchitectureMap | None" = None
     file_events: List["FileChangeEvent"] = field(default_factory=list)
+    focus_paths: Set[str] = field(default_factory=set)
+    code_awareness_focus_mode: bool = False
 
 
 @dataclass
@@ -108,7 +113,7 @@ class HistoryRecord:
 class ArchitectureMap:
     """Persistent mapping between architecture layers and project directories."""
 
-    version: int = 1
+    version: int = ARCHITECTURE_MAP_VERSION
     project_root: str = ""
     updated_at: float = 0.0
     source: str = "fallback_rules"  # "llm" | "fallback_rules"
@@ -118,3 +123,9 @@ class ArchitectureMap:
     layer_descriptions: Dict[str, str] = field(default_factory=dict)
     layer_order: List[str] = field(default_factory=list)
     file_events: List[FileChangeEvent] = field(default_factory=list)
+    #: Relative path -> top-level symbol names (LSP documentSymbol or heuristic).
+    file_symbol_outline: Dict[str, List[str]] = field(default_factory=dict)
+    #: Relative directory path -> short role label (entry, api, pkg, test, ...).
+    dir_role_hints: Dict[str, str] = field(default_factory=dict)
+    #: When symbol outlines were last merged (epoch seconds).
+    tech_map_updated_at: float = 0.0

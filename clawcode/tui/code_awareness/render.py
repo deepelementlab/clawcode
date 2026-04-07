@@ -80,6 +80,9 @@ def _render_tree(
     mod_last_index: dict[str, int],
     read_last_index: dict[str, int],
     dir_to_layer: dict[str, str] | None = None,
+    dir_role_hints: dict[str, str] | None = None,
+    file_symbol_outline: dict[str, list[str]] | None = None,
+    focus_paths: Set[str] | None = None,
     prefix: str = "",
     is_last_stack: list[bool] | None = None,
     depth: int = 0,
@@ -114,7 +117,15 @@ def _render_tree(
             has_mod = _has_marked_descendant(node, modified, read_paths)
             style = f"bold {accent}" if has_mod else muted
             out.append(f"{indent}{connector}", style=muted)
-            out.append(f"{node.name}/\n", style=style)
+            role_tag = ""
+            if dir_role_hints:
+                r = dir_role_hints.get(node_path, "")
+                if r:
+                    role_tag = f" [{r}]"
+            out.append(f"{node.name}/", style=style)
+            if role_tag:
+                out.append(role_tag, style=muted)
+            out.append("\n")
 
             # Render modified files inside this directory
             files_here = []
@@ -148,6 +159,9 @@ def _render_tree(
                     mod_last_index=mod_last_index,
                     read_last_index=read_last_index,
                     dir_to_layer=dir_to_layer,
+                    dir_role_hints=dir_role_hints,
+                    file_symbol_outline=file_symbol_outline,
+                    focus_paths=focus_paths,
                     is_last_stack=child_indent_stack,
                     depth=depth + 1,
                     max_render_depth=max_render_depth,
@@ -183,6 +197,13 @@ def _render_tree(
                     read_idx = read_last_index.get(fpath)
                     if read_idx is not None:
                         out.append(f" R{read_idx}", style=muted)
+                if file_symbol_outline:
+                    syms = file_symbol_outline.get(fpath, [])
+                    if syms:
+                        brief = ", ".join(syms[:4])
+                        if len(syms) > 4:
+                            brief += f" +{len(syms) - 4}"
+                        out.append(f"  ({brief})", style=muted)
                 out.append("\n")
 
             # If directory has more non-modified content, show ellipsis
@@ -264,8 +285,13 @@ def render_awareness(
     mod_last_index = _last_event_index(state.modification_events)
     read_last_index = _last_event_index(state.read_events)
     dir_map: dict[str, str] | None = None
+    dir_roles: dict[str, str] | None = None
+    sym_outline: dict[str, list[str]] | None = None
     if state.architecture_map is not None:
         dir_map = state.architecture_map.dir_to_layer
+        dir_roles = state.architecture_map.dir_role_hints or None
+        sym_outline = state.architecture_map.file_symbol_outline or None
+    focus = state.focus_paths if state.code_awareness_focus_mode else None
 
     # Observability: unique paths vs tail event buffer length; optional stage-1 outline stats.
     audit_bits: list[str] = [
@@ -283,6 +309,9 @@ def render_awareness(
                 s1_parts.append("trunc")
             if s1_parts:
                 audit_bits.append("S1 " + ",".join(s1_parts))
+        sym_count = len(state.architecture_map.file_symbol_outline)
+        if sym_count:
+            audit_bits.append(f"Sym {sym_count}")
     out.append("  " + " · ".join(audit_bits) + "\n", style=muted)
     mode = "full" if state.history_expanded else "summary"
     out.append(f"  Ops: [Y] history({mode})\n\n", style=muted)
@@ -348,6 +377,9 @@ def render_awareness(
             mod_last_index=mod_last_index,
             read_last_index=read_last_index,
             dir_to_layer=dir_map,
+            dir_role_hints=dir_roles,
+            file_symbol_outline=sym_outline,
+            focus_paths=focus,
             is_last_stack=[],
             depth=0,
         )

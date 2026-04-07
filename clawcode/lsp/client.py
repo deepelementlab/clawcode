@@ -745,6 +745,25 @@ class LSPClient:
 
         return self.get_file_diagnostics(file_path)
 
+    async def document_symbols(self, file_path: str, *, timeout: float = 5.0) -> List[Dict[str, Any]]:
+        """Request textDocument/documentSymbol for an open file.
+
+        Returns the raw list of DocumentSymbol / SymbolInformation dicts from
+        the server, or an empty list on failure.
+        """
+        uri = f"file://{Path(file_path).absolute()}"
+        try:
+            result = await self.call(
+                "textDocument/documentSymbol",
+                {"textDocument": {"uri": uri}},
+                timeout=timeout,
+            )
+            if isinstance(result, list):
+                return result
+        except Exception as e:
+            logger.debug("documentSymbol failed for %s: %s", file_path, e)
+        return []
+
     # Default handlers
 
     def _handle_publish_diagnostics(self, params: Any):
