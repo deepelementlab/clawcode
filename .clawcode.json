@@ -428,7 +428,8 @@
     "theme": "catppuccin",
     "mouse_enabled": true,
     "save_theme_preference": true,
-    "external_editor": ""
+    "external_editor": "",
+    "display_version": "0.1.1"
   },
   "shell": {
     "path": "cmd.exe",
