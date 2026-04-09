@@ -383,20 +383,20 @@ With `/clawteam`, the system can orchestrate roles and execution:
 
 | Role ID | Role | Responsibility & typical outputs |
 | --- | --- | --- |
-| `clawteam-product-manager` | Product manager | Priorities, roadmap, value hypotheses; scope and acceptance criteria |
-| `clawteam-business-analyst` | Business analyst | Process and rules; requirements, edge cases, business acceptance |
-| `clawteam-system-architect` | System architect | Architecture and tech choices; modules, APIs, NFRs (performance, security, …) |
-| `clawteam-ui-ux-designer` | UI/UX | IA and interaction; page/component UX constraints |
-| `clawteam-dev-manager` | Engineering manager | Rhythm and dependencies; risks, staffing, milestones |
-| `clawteam-team-lead` | Tech lead | Technical decisions and quality bar; split of work, review, integration |
-| `clawteam-rnd-backend` | Backend | Services, APIs, data layer; contracts and implementation |
-| `clawteam-rnd-frontend` | Frontend | UI and front-end engineering; components, state, integration |
-| `clawteam-rnd-mobile` | Mobile | Mobile/cross-platform; release constraints |
-| `clawteam-devops` | DevOps | CI/CD and release; pipelines, artifacts, environments |
-| `clawteam-qa` | QA | Test strategy and gates; cases, regression scope, severity |
-| `clawteam-sre` | SRE | Availability, capacity, observability; SLOs, alerts, runbooks |
-| `clawteam-project-manager` | Project manager | Scope, schedule, stakeholders; milestones and change control |
-| `clawteam-scrum-master` | Scrum Master | Iteration rhythm and blockers; ceremony and collaboration norms |
+| [`clawteam-product-manager`](./.claw/agents/clawteam-product-manager.md) | Product manager | Priorities, roadmap, value hypotheses; scope and acceptance criteria |
+| [`clawteam-business-analyst`](./.claw/agents/clawteam-business-analyst.md) | Business analyst | Process and rules; requirements, edge cases, business acceptance |
+| [`clawteam-system-architect`](./.claw/agents/clawteam-system-architect.md) | System architect | Architecture and tech choices; modules, APIs, NFRs (performance, security, …) |
+| [`clawteam-ui-ux-designer`](./.claw/agents/clawteam-ui-ux-designer.md) | UI/UX | IA and interaction; page/component UX constraints |
+| [`clawteam-dev-manager`](./.claw/agents/clawteam-dev-manager.md) | Engineering manager | Rhythm and dependencies; risks, staffing, milestones |
+| [`clawteam-team-lead`](./.claw/agents/clawteam-team-lead.md) | Tech lead | Technical decisions and quality bar; split of work, review, integration |
+| [`clawteam-rnd-backend`](./.claw/agents/clawteam-rnd-backend.md) | Backend | Services, APIs, data layer; contracts and implementation |
+| [`clawteam-rnd-frontend`](./.claw/agents/clawteam-rnd-frontend.md) | Frontend | UI and front-end engineering; components, state, integration |
+| [`clawteam-rnd-mobile`](./.claw/agents/clawteam-rnd-mobile.md) | Mobile | Mobile/cross-platform; release constraints |
+| [`clawteam-devops`](./.claw/agents/clawteam-devops.md) | DevOps | CI/CD and release; pipelines, artifacts, environments |
+| [`clawteam-qa`](./.claw/agents/clawteam-qa.md) | QA | Test strategy and gates; cases, regression scope, severity |
+| [`clawteam-sre`](./.claw/agents/clawteam-sre.md) | SRE | Availability, capacity, observability; SLOs, alerts, runbooks |
+| [`clawteam-project-manager`](./.claw/agents/clawteam-project-manager.md) | Project manager | Scope, schedule, stakeholders; milestones and change control |
+| [`clawteam-scrum-master`](./.claw/agents/clawteam-scrum-master.md) | Scrum Master | Iteration rhythm and blockers; ceremony and collaboration norms |
 
 Short aliases (e.g. `qa`, `sre`, `product-manager`) map to the `clawteam-*` roles above—see `docs/CLAWTEAM_SLASH_GUIDE.md`.
 **Why it matters:** Moves from “one model, one thread” to **multi-role collaborative problem solving**.
