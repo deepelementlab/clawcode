@@ -3,6 +3,20 @@
     "directory": ".clawcode"
   },
   "providers": {
+    "openrouter": {
+      "api_key": "",
+      "base_url": null,
+      "disabled": true,
+      "timeout": 120,
+      "models": [
+        "qwen/qwen3.6-plus",
+        "openai/gpt-4o",
+        "anthropic/claude-3.5-sonnet",
+        "google/gemini-pro-1.5",
+        "deepseek/deepseek-chat",
+        "meta-llama/llama-3.3-70b-instruct"
+      ]
+    },
     "anthropic": {
       "api_key": "",
       "base_url": null,
@@ -68,19 +82,6 @@
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
         "mixtral-8x7b-32768"
-      ]
-    },
-    "openrouter": {
-      "api_key": "",
-      "base_url": null,
-      "disabled": true,
-      "timeout": 120,
-      "models": [
-        "openai/gpt-4o",
-        "anthropic/claude-3.5-sonnet",
-        "google/gemini-pro-1.5",
-        "deepseek/deepseek-chat",
-        "meta-llama/llama-3.3-70b-instruct"
       ]
     },
     "xai": {
