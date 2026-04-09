@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(find D:\\\\opensource_project\\\\opencode-main\\\\opencode-main\\\\clawcode:*)"
+    ]
+  }
+}
