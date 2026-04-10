@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Spotify
+role_hint: Spotify consumer
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Spotify
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What distinguishes Spotify is its pill-and-circle geometry. Primary buttons use 
 - Heavy shadows on elevated elements (`rgba(0,0,0,0.5) 0px 8px 24px`)
 - Semantic colors: negative red (`#f3727f`), warning orange (`#ffa42b`), announcement blue (`#539df5`)
 - Album art as the primary color source — the UI is achromatic by design
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Spotify consumer** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

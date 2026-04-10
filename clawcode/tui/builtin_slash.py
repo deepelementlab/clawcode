@@ -123,6 +123,10 @@ BUILTIN_SLASH_COMMANDS: list[tuple[str, str]] = [
         "Set the output style directly or from a selection menu",
     ),
     (
+        "ui-style",
+        "Manage UI style mode, selection, and auto-pick behavior",
+    ),
+    (
         "permissions",
         "Manage allow & deny tool permission rules",
     ),
@@ -443,6 +447,16 @@ class BuiltinSlashContext:
     plan_blocks_claw: bool = False
     #: True when this chat session has Claw mode enabled (for /doctor desktop checks).
     claw_mode_enabled: bool = False
+    #: UI style forcing mode for this session.
+    ui_style_mode: str = "off"
+    #: Currently selected UI style slug for this session.
+    ui_style_selected: str = ""
+    #: Last UI style selection reason for `/ui-style why`.
+    ui_style_reason: str = ""
+    #: Last top-k auto candidates for `/ui-style why`.
+    ui_style_top_candidates: list[str] = field(default_factory=list)
+    #: How the current UI style was chosen (e.g. auto, user).
+    ui_style_source: str = ""
 
 
 def parse_slash_line(text: str) -> tuple[str | None, str]:

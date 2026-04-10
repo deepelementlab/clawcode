@@ -1,3 +1,14 @@
+---
+title: Stripe
+styleTags: [fintech_premium, light_precision, blue_tinted_shadow, technical_luxury]
+fitDomains: [fintech, payments, enterprise_saas]
+fitSurfaces: [pricing_page, docs_marketing, product_explainer]
+avoidSurfaces: [playful_social_feed, game_like_ui]
+toneKeywords: [trustworthy, premium, technical, calm]
+density: medium
+visualEnergy: balanced
+---
+
 # Design System: Stripe
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +28,26 @@ What truly distinguishes Stripe is its shadow system. Rather than the flat or si
 - Conservative border-radius (4px-8px) -- nothing pill-shaped, nothing harsh
 - Ruby (`#ea2261`) and magenta (`#f96bee`) accents for gradient and decorative elements
 - `SourceCodePro` as the monospace companion for code and technical labels
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+Clean white foundation + deep navy typography + signature purple anchor + lightweight geometry + blue-tinted layered shadows.
+
+### Best For
+- Payment and checkout product surfaces
+- Financial product marketing and conversion pages
+- API/platform storytelling where trust and clarity are both critical
+
+### Not Ideal For
+- Youthful entertainment interfaces that rely on vivid playful palettes
+- Ultra-minimal monochrome systems with almost no brand color
+
+### Experience Goal
+Communicate reliability and financial-grade precision while still feeling modern and premium.
+
+### Style Tags
+`fintech_premium`, `light_precision`, `purple_anchor`, `trust_first`, `conversion_ready`
 
 ## 2. Color Palette & Roles
 

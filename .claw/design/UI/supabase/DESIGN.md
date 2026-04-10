@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Supabase
+role_hint: Supabase BaaS
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Supabase
 
 ## 1. Visual Theme & Atmosphere
@@ -21,6 +35,23 @@ The green accent (`#3ecf8e`) appears selectively — in the Supabase logo, in li
 - Border system using dark grays (`#2e2e2e`, `#363636`, `#393939`)
 - Minimal shadows — depth through border contrast and transparency
 - Radix color primitives (crimson, purple, violet, indigo, yellow, tomato, orange, slate)
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Supabase BaaS** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

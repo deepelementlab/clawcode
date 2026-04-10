@@ -36,7 +36,9 @@ from ...builtin_slash import (
 DEFAULT_INPUT_HELP_LINE = (
     "press enter to send the message, write \\ and enter to add a new line"
 )
-SLASH_INPUT_HELP_SUFFIX = " | / commands: tab · ↑↓ | @ file: tab · ↑↓ | Tab: autocomplete"
+SLASH_INPUT_HELP_SUFFIX = (
+    " | / commands: tab · ↑↓ | @ file: tab · ↑↓ | history: Tab · → · ↑↓ (list)"
+)
 
 # App-level actions while focus is in the input subtree (TextArea may swallow keys before App BINDINGS).
 # Help: Textual maps Ctrl+H (ASCII 8) to ``backspace``, same as the Backspace key — we cannot bind
@@ -306,8 +308,13 @@ class PasteAwareTextArea(TextArea):
             return
         await super()._on_mouse_down(event)
 
-    async def _on_key(self, event: events.Key) -> None:
-        """Run parent :class:`MessageInput` key handling before TextArea so Enter/slash/history win over TextArea bindings."""
+    async def on_key(self, event: events.Key) -> None:
+        """Run parent :class:`MessageInput` key handling before TextArea so Enter/slash/history win over TextArea bindings.
+
+        Uses ``on_key`` (not ``_on_key``) so Textual dispatches the :class:`~textual.events.Key`
+        event here reliably; ``MessageInput`` logic is invoked explicitly, then remaining
+        keys defer to :class:`~textual.widgets.TextArea` via ``super()._on_key``.
+        """
         if _dispatch_app_global_shortcut(event, getattr(self, "app", None)):
             return
         mi = self._message_input_parent()
@@ -567,7 +574,7 @@ class MessageInput(Static):
             panel = self.query_one("#history_suggest", Static)
         except Exception:
             return
-        if not self._smart_suggestions or len(self._smart_suggestions) < 2:
+        if not self._smart_suggestions:
             panel.add_class("history_suggest_hidden")
             panel.update("")
             return
@@ -601,8 +608,10 @@ class MessageInput(Static):
         except Exception:
             return False
 
-        if self._smart_suggestions and len(self._smart_suggestions) >= 2:
-            chosen = self._smart_suggestions[self._smart_suggest_index]
+        if self._smart_suggestions:
+            chosen = self._smart_suggestions[
+                self._smart_suggest_index % len(self._smart_suggestions)
+            ]
         elif self._ghost_text:
             current = (ta.text or "")
             chosen = current + self._ghost_text
@@ -1101,7 +1110,7 @@ class MessageInput(Static):
                 self._sync_completion_panels()
                 return
 
-        # Smart completion: Tab accepts, Right accepts inline, Esc dismisses
+        # Smart completion: Tab accepts, Right accepts inline, Esc dismisses, arrows navigate list
         if self._smart_suggest_active and self._vim_mode == "insert":
             if event.key == "tab":
                 event.stop()
@@ -1120,8 +1129,19 @@ class MessageInput(Static):
                 event.stop()
                 self._dismiss_smart_suggestions()
                 return
+            if (
+                self._smart_suggestions
+                and len(self._smart_suggestions) >= 2
+                and event.key in ("up", "down", "pageup", "pagedown")
+            ):
+                event.stop()
+                if event.key in ("up", "pageup"):
+                    self._smart_suggest_navigate(-1)
+                else:
+                    self._smart_suggest_navigate(1)
+                return
 
-        # Smart suggestion panel navigation (when panel has >=2 items)
+        # Smart suggestion panel navigation (Ctrl+N / Ctrl+P when list has 2+ items)
         if (
             self._smart_suggest_active
             and self._smart_suggestions

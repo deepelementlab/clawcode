@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Together AI
+role_hint: Together AI
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Together AI
 
 ## 1. Visual Theme & Atmosphere
@@ -18,6 +32,23 @@ What makes Together AI distinctive is its type system. "The Future" handles all 
 - Lavender (#bdbbff) as a soft secondary accent
 - Enterprise stats prominently displayed (2x, 60%, 90%)
 - Dark-blue-tinted shadows (rgba(1, 1, 32, 0.1))
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Together AI** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

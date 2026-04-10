@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Zapier
+role_hint: Zapier automation
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Zapier
 
 ## 1. Visual Theme & Atmosphere
@@ -18,6 +32,23 @@ The brand's signature orange (`#ff4f00`) is unmistakable -- a vivid, saturated r
 - Warm neutral palette: borders (`#c5c0b1`), muted text (`#939084`), surface tints (`#eceae3`)
 - 8px base spacing system with generous padding on CTAs (20px 24px)
 - Border-forward design: `1px solid` borders in warm grays define structure over shadows
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Zapier automation** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

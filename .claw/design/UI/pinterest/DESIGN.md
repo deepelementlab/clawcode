@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Pinterest
+role_hint: Pinterest consumer
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Pinterest
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What distinguishes Pinterest is its generous border-radius system (12px–40px, 
 - Generous border-radius: 16px standard, up to 40px for large containers
 - Photography-first content — pins/images are the primary visual element
 - Dark near-purple text (`#211922`) — warm, with a hint of plum
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Pinterest consumer** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

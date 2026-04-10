@@ -1,3 +1,14 @@
+---
+title: Vercel
+styleTags: [minimal_engineering, monochrome, shadow_border, devtools]
+fitDomains: [developer_tooling, saas, infrastructure]
+fitSurfaces: [docs_marketing, product_landing, dashboard_shell]
+avoidSurfaces: [high_emotion_storytelling, playful_gamified_ui]
+toneKeywords: [precise, calm, technical, premium]
+density: medium
+visualEnergy: calm
+---
+
 # Design System: Vercel
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +28,26 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Workflow-specific accent colors: Ship Red (`#ff5b4f`), Preview Pink (`#de1d8d`), Develop Blue (`#0a72ef`)
 - Focus ring system using `hsla(212, 100%, 48%, 1)` — a saturated blue for accessibility
 - Pill badges (9999px) with tinted backgrounds for status indicators
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+Pure white canvas + near-black text + one functional accent + shadow-as-border + compressed heading tracking.
+
+### Best For
+- Developer infrastructure landing pages
+- Product marketing for API/platform tools
+- Documentation surfaces that need clarity over decoration
+
+### Not Ideal For
+- Highly playful, entertainment-heavy consumer experiences
+- Story-first editorial pages with vivid multi-color narratives
+
+### Experience Goal
+Convey precision, trust, and engineered simplicity while keeping attention on product value.
+
+### Style Tags
+`minimal_engineering`, `monochrome`, `shadow_border`, `devtools`, `technical_premium`
 
 ## 2. Color Palette & Roles
 

@@ -1,3 +1,14 @@
+---
+title: Notion
+styleTags: [warm_minimal, editorial_utility, thin_border, content_first]
+fitDomains: [knowledge_management, docs, note_taking, productivity]
+fitSurfaces: [editor_workspace, docs_site, knowledge_portal]
+avoidSurfaces: [high_contrast_cyberpunk, loud_visual_branding]
+toneKeywords: [approachable, calm, thoughtful, organized]
+density: medium
+visualEnergy: calm
+---
+
 # Design System: Notion
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +28,26 @@ What makes Notion's visual language distinctive is its border philosophy. Rather
 - Notion Blue (`#0075de`) as the singular accent color for CTAs and interactive elements
 - Pill badges (9999px radius) with tinted blue backgrounds for status indicators
 - 8px base spacing unit with an organic, non-rigid scale
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+Warm neutral canvas + near-black text + whisper-thin borders + subtle depth + one calm accent.
+
+### Best For
+- Documentation and long-form content products
+- Knowledge workspaces and internal wiki platforms
+- Tools where readability and structure outrank visual spectacle
+
+### Not Ideal For
+- High-energy campaign pages with frequent color shifts
+- Data-dense monitoring interfaces requiring sharp contrast encoding
+
+### Experience Goal
+Feel quiet, organized, and human; keep users in flow while content remains the primary focus.
+
+### Style Tags
+`warm_minimal`, `editorial_utility`, `thin_border`, `content_first`, `readability_first`
 
 ## 2. Color Palette & Roles
 

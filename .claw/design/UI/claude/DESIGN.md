@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Claude (Anthropic)
+role_hint: Anthropic Claude product UI
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Claude (Anthropic)
 
 ## 1. Visual Theme & Atmosphere
@@ -16,6 +30,23 @@ What makes Claude's design truly distinctive is its warm neutral palette. Every 
 - Organic, editorial illustrations replacing typical tech iconography
 - Ring-based shadow system (`0px 0px 0px 1px`) creating border-like depth without visible borders
 - Magazine-like pacing with generous section spacing and serif-driven hierarchy
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Anthropic Claude product UI** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

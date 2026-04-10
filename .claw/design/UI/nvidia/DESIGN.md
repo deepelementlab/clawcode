@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: NVIDIA
+role_hint: NVIDIA marketing / dev
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: NVIDIA
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What distinguishes NVIDIA's design from other dark-background tech sites is the 
 - Green-bordered buttons (`2px solid #76b900`) as primary interactive pattern
 - Font Awesome 6 Pro/Sharp icon system at weight 900 for sharp iconography
 - Multi-framework architecture (PrimeReact, Fluent UI, Element Plus) enabling rich interactive components
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **NVIDIA marketing / dev** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

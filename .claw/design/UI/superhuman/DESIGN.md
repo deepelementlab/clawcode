@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Superhuman
+role_hint: Superhuman email
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Superhuman
 
 ## 1. Visual Theme & Atmosphere
@@ -16,6 +30,23 @@ The design philosophy is maximum confidence through minimum decoration. Warm cre
 - Lavender Purple (`#cbb7fb`) as the singular accent color — a soft, approachable purple
 - Minimal border-radius scale: only 8px and 16px — no micro-rounding, no pill shapes
 - Product screenshots dominate the content — the UI sells itself with minimal surrounding decoration
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Superhuman email** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: ElevenLabs
+role_hint: Voice / audio AI
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: ElevenLabs
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What makes ElevenLabs distinctive is its multi-layered shadow system. Rather tha
 - WaldenburgFH bold uppercase for specific CTA labels
 - Warm shadow tints: `rgba(78, 50, 23, 0.04)` — shadows have color, not just darkness
 - Geist Mono / ui-monospace for code snippets
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Voice / audio AI** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

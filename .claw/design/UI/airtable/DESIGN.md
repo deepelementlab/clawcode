@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Airtable
+role_hint: Database / no-code UI
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Airtable
 
 ## 1. Visual Theme & Atmosphere
@@ -12,6 +26,23 @@ Airtable's website is a clean, enterprise-friendly platform that communicates "s
 - 12px radius buttons, 16px–32px for cards
 - Multi-layer blue-tinted shadow: `rgba(45,127,249,0.28) 0px 1px 3px`
 - Semantic theme tokens: `--theme_*` CSS variable naming
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Database / no-code UI** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

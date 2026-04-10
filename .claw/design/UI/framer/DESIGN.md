@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Framer
+role_hint: Framer site builder
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Framer
 
 ## 1. Visual Theme & Atmosphere
@@ -16,6 +30,23 @@ The overall effect is a nightclub for web designers: dark, precise, seductive, a
 - Product screenshots as hero art — the tool IS the marketing
 - Frosted glass button variants using `rgba(255, 255, 255, 0.1)` on dark surfaces
 - Extensive OpenType feature usage across Inter for refined micro-typography
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Framer site builder** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

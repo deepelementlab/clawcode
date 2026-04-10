@@ -1,0 +1,8 @@
+{
+  "primary_color": "#171717",
+  "background": "#ffffff",
+  "text": "#171717",
+  "radius": "6px",
+  "shadow": "0px 0px 0px 1px rgba(0,0,0,0.08)",
+  "font_family": "Geist, Geist Mono"
+}

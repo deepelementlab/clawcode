@@ -44,11 +44,15 @@ class AppContext:
 async def create_app(
     working_dir: str = "",
     debug: bool = False,
+    *,
+    launch_working_directory: str | None = None,
 ) -> AppContext:
     """Build application context: load settings, init DB, create services and event bus.
 
     Args:
         working_dir: Override working directory (default from settings/cwd).
+        launch_working_directory: Shell cwd when the CLI started (for UI catalog lookup
+            alongside ``-c`` target).
         debug: Enable debug mode.
 
     Returns:
@@ -58,6 +62,8 @@ async def create_app(
     settings = await load_settings(working_directory=working_dir or None, debug=debug)
     if working_dir:
         settings.working_directory = working_dir
+    if launch_working_directory:
+        settings.cli_launch_directory = str(Path(launch_working_directory).expanduser().resolve())
     data_dir = settings.ensure_data_directory()
     db_path = data_dir / "clawcode.db"
     await init_database(db_path)

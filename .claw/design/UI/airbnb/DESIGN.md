@@ -1,3 +1,14 @@
+---
+title: Airbnb
+styleTags: [photo_first, warm_marketplace, rounded_soft, lifestyle_commerce]
+fitDomains: [travel, ecommerce, social, portfolio]
+fitSurfaces: [listing_grid, product_detail, lifestyle_landing]
+avoidSurfaces: [ultra_dense_ops_dashboard, terminal_like_devtools]
+toneKeywords: [warm, trustworthy, premium, inviting]
+density: low
+visualEnergy: balanced
+---
+
 # Design System: Airbnb
 
 ## 1. Visual Theme & Atmosphere
@@ -18,6 +29,26 @@ What distinguishes Airbnb is its palette-based token system (`--palette-*`) and 
 - Photography-first listing cards — images are the hero content
 - Near-black text (`#222222`) — warm, not cold
 - Luxe Purple (`#460479`) and Plus Magenta (`#92174d`) for premium tiers
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+Pure background + warm dark text + single brand red + natural three-layer shadow + large radius + photography-first hierarchy.
+
+### Best For
+- Content-driven marketplace and discovery products
+- Lifestyle, travel, social, and portfolio experiences
+- Commerce interfaces where imagery and trust cues drive conversion
+
+### Not Ideal For
+- Operational dashboards with dense tabular telemetry
+- Engineering-heavy consoles optimized for compact command surfaces
+
+### Experience Goal
+Create a warm, credible, high-quality browsing experience that keeps focus on photos, products, and stories.
+
+### Style Tags
+`photo_first`, `warm_marketplace`, `rounded_soft`, `lifestyle_commerce`, `trust_visuals`
 
 ## 2. Color Palette & Roles
 

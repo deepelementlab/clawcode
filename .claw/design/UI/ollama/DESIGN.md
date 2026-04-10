@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Ollama
+role_hint: Ollama local LLM
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Ollama
 
 ## 1. Visual Theme & Atmosphere
@@ -16,6 +30,23 @@ What makes Ollama distinctive is the combination of SF Pro Rounded (Apple's roun
 - Pill-shaped geometry on all interactive elements (buttons, tabs, inputs, tags)
 - The Ollama llama as the sole illustration — black line art, no color
 - Extreme content restraint — the homepage is short, focused, and uncluttered
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Ollama local LLM** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

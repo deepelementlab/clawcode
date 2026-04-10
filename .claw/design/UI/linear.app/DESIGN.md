@@ -1,3 +1,14 @@
+---
+title: Linear
+styleTags: [dark_native, high_density, product_ops, indigo_accent]
+fitDomains: [developer_tooling, b2b_saas, project_management]
+fitSurfaces: [workspace_app, dashboard, issue_tracking]
+avoidSurfaces: [photo_storytelling, warm_editorial_marketing]
+toneKeywords: [focused, precise, efficient, modern]
+density: high
+visualEnergy: balanced
+---
+
 # Design System: Linear
 
 ## 1. Visual Theme & Atmosphere
@@ -19,6 +30,26 @@ The color system is almost entirely achromatic — dark backgrounds with white/g
 - Multi-layered shadows with inset variants for depth on dark surfaces
 - Radix UI primitives as the component foundation (6 detected primitives)
 - Success green (`#27a644`, `#10b981`) used only for status indicators
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+Dark-native surfaces + subtle luminance hierarchy + single indigo accent + dense information blocks + restrained glow.
+
+### Best For
+- Product workspaces with complex state
+- Admin and operations-heavy SaaS dashboards
+- Fast navigation interfaces for expert users
+
+### Not Ideal For
+- Photography-first storytelling sites
+- Warm lifestyle or travel landing experiences
+
+### Experience Goal
+Deliver control, speed, and clarity for repeated daily workflows with minimal visual noise.
+
+### Style Tags
+`dark_native`, `high_density`, `product_ops`, `indigo_accent`, `expert_workflow`
 
 ## 2. Color Palette & Roles
 

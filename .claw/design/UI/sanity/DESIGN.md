@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Sanity
+role_hint: Sanity CMS
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Sanity
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What makes Sanity distinctive is the interplay between its monochromatic dark pa
 - IBM Plex Mono as the technical counterweight to the editorial display face
 - Full-bleed dark sections with content contained in measured max-width containers
 - Hover states that shift to electric blue (`#0052ef`) across all interactive elements -- a consistent "activation" signal
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Sanity CMS** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

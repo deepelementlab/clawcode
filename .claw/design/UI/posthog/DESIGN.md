@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: PostHog
+role_hint: PostHog analytics
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: PostHog
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ The interaction design carries the same spirit: hover states flash PostHog Orang
 - Dark near-black CTAs (`#1e1f23`) with opacity-based hover states
 - Content-heavy editorial layout — the site reads like a magazine, not a typical landing page
 - Tailwind CSS + Radix UI + shadcn/ui component architecture
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **PostHog analytics** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

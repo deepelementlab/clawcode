@@ -13,7 +13,11 @@ from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..config.settings import Settings, append_context_path_to_clawcode_json
+from ..config.settings import (
+    Settings,
+    append_context_path_to_clawcode_json,
+    save_ui_style_mode_to_clawcode_json,
+)
 from ..message.service import MessageRole
 
 if TYPE_CHECKING:
@@ -100,6 +104,15 @@ from ..session import SessionService
 from .architect_params import ArchitectArgs, parse_architect_args
 from .builtin_slash import BuiltinSlashContext, BuiltinSlashOutcome
 from .components.dialogs.display_mode import MODES as _DISPLAY_MODE_ITEMS
+from .ui_style import (
+    choose_secondary_ui_style_candidate,
+    evaluate_ui_style_text,
+    format_ui_style_compact,
+    load_ui_anti_patterns,
+    load_ui_anti_pattern_rules,
+    load_ui_catalog,
+    ui_catalog_candidate_hints,
+)
 
 _EXPORT_MSG_MAX = 12_000
 _EXPORT_TOTAL_MAX = 400_000
@@ -154,6 +167,18 @@ def _export_message_markdown(msg: Any, max_chars: int = _EXPORT_MSG_MAX) -> str:
         chunks.append("_(no text body)_")
     lines.append("\n\n".join(chunks) + "\n")
     return "".join(lines)
+
+
+def _message_text_body(msg: Any) -> str:
+    chunks: list[str] = []
+    txt = str(getattr(msg, "content", "") or "").strip()
+    if txt:
+        chunks.append(txt)
+    for p in getattr(msg, "parts", None) or []:
+        c = str(getattr(p, "content", "") or "").strip()
+        if c:
+            chunks.append(c)
+    return "\n".join(chunks).strip()
 
 
 def _context_ascii_bar(percent: int, width: int = 10) -> str:
@@ -1329,6 +1354,7 @@ async def handle_builtin_slash(
     head = alias_map.get(head, head)
     wd = (settings.working_directory or ".").strip() or "."
     root = Path(wd).expanduser().resolve()
+    _ui_cli_host = str(getattr(settings, "cli_launch_directory", "") or "").strip() or None
 
     if head == "todos":
         lines = ["# Current todos\n\n"]
@@ -3080,6 +3106,189 @@ async def handle_builtin_slash(
                 "Opening the display mode picker. Shortcut: **Ctrl+D**.\n"
             ),
             ui_action="open_display_mode",
+        )
+
+    if head == "ui-style":
+        parts = tail.strip().split()
+        sub = (parts[0].lower() if parts else "status").strip()
+        arg = " ".join(parts[1:]).strip() if len(parts) > 1 else ""
+        styles = load_ui_catalog(root, cli_launch_directory=_ui_cli_host)
+        if sub in ("on", "off"):
+            mode = "on" if sub == "on" else "off"
+            try:
+                save_ui_style_mode_to_clawcode_json(mode, working_directory=str(root))
+            except Exception:
+                # best-effort persistence; session update still applies.
+                pass
+            return BuiltinSlashOutcome(
+                kind="assistant_message",
+                assistant_text=(
+                    f"UI style mode set to **{mode}**.\n"
+                    "When `on`, UI-related tasks must select a style before coding.\n"
+                ),
+                routing_meta={"ui_style": {"mode": mode}},
+            )
+        if sub == "set":
+            slug = arg.strip()
+            if not slug:
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text="Usage: `/ui-style set <slug>`\n",
+                )
+            known = {s.slug: s for s in styles}
+            if known and slug not in known:
+                sample = ", ".join(sorted(list(known.keys()))[:10])
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text=f"Unknown style slug `{slug}`.\nTry `/ui-style list`.\nExamples: {sample}\n",
+                )
+            return BuiltinSlashOutcome(
+                kind="assistant_message",
+                assistant_text=f"UI style locked to **{slug}** (source=user).\n",
+                routing_meta={"ui_style": {"selected": slug, "source": "user", "reason": "user set"}},
+            )
+        if sub == "auto":
+            return BuiltinSlashOutcome(
+                kind="assistant_message",
+                assistant_text="Cleared manual style selection. Next UI task will auto-pick.\n",
+                routing_meta={"ui_style": {"selected": "", "source": "auto", "reason": "manual cleared"}},
+            )
+        if sub == "list":
+            q = arg.lower()
+            rows = [s for s in styles if not q or q in s.slug.lower() or q in s.role.lower() or q in " ".join(s.tags).lower()]
+            lines = ["# UI styles\n\n"]
+            if not rows:
+                lines.append("No style found.\n")
+                hints = ui_catalog_candidate_hints(root, cli_launch_directory=_ui_cli_host)
+                if hints:
+                    lines.append(
+                        "Catalog lookup paths:\n"
+                        + "".join(f"- `{p}`\n" for p in hints[:3])
+                        + "If none exists, run: `py -3 scripts/build_ui_style_catalog.py`\n"
+                    )
+            else:
+                for st in rows[:80]:
+                    tags = f" ({', '.join(st.tags[:4])})" if st.tags else ""
+                    role = f" — {st.role}" if st.role else ""
+                    lines.append(f"- `{st.slug}`{role}{tags}\n")
+            lines.append("\nUse `/ui-style set <slug>` to pin one.\n")
+            return BuiltinSlashOutcome(kind="assistant_message", assistant_text="".join(lines))
+        if sub == "show":
+            slug = arg.strip() or (ctx.ui_style_selected or "").strip()
+            if not slug:
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text="Usage: `/ui-style show <slug>` (or select one first).\n",
+                )
+            hit = next((s for s in styles if s.slug == slug), None)
+            if hit is None:
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text=f"Unknown style slug `{slug}`.\n",
+                )
+            return BuiltinSlashOutcome(kind="assistant_message", assistant_text=format_ui_style_compact(hit))
+        if sub == "eval":
+            slug = (ctx.ui_style_selected or "").strip()
+            if not slug:
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text=(
+                        "No selected UI style.\n"
+                        "Use `/ui-style set <slug>` first, or send a UI task with `/ui-style auto`.\n"
+                    ),
+                )
+            hit = next((s for s in styles if s.slug == slug), None)
+            if hit is None:
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text=f"Unknown selected style `{slug}`.\n",
+                )
+            source_text = arg
+            if not source_text:
+                sid = (ctx.session_id or "").strip()
+                if not sid or message_service is None:
+                    return BuiltinSlashOutcome(
+                        kind="assistant_message",
+                        assistant_text=(
+                            "Usage: `/ui-style eval <ui-output-text>`\n"
+                            "Or run within an active session to auto-read last assistant message.\n"
+                        ),
+                    )
+                try:
+                    msgs = await message_service.list_by_session(sid, limit=80)
+                except Exception:
+                    msgs = []
+                last_assistant = next((m for m in reversed(msgs) if str(getattr(m, "role", "")).lower().endswith("assistant")), None)
+                source_text = _message_text_body(last_assistant) if last_assistant is not None else ""
+            if not source_text.strip():
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text="No assistant output text found for evaluation.\n",
+                )
+            anti = load_ui_anti_patterns(root, slug=hit.slug, cli_launch_directory=_ui_cli_host)
+            anti_rules = load_ui_anti_pattern_rules(
+                root, slug=hit.slug, cli_launch_directory=_ui_cli_host
+            )
+            next_best = choose_secondary_ui_style_candidate(
+                source_text,
+                styles,
+                top_candidates=list(ctx.ui_style_top_candidates or []),
+            )
+            ev = evaluate_ui_style_text(
+                source_text,
+                hit,
+                anti_patterns=anti,
+                anti_rules=anti_rules,
+                next_best_slug=(next_best[0] if next_best is not None else ""),
+            )
+            lines = [
+                "# UI style eval\n\n",
+                f"- slug: `{ev.slug}`\n",
+                f"- color_consistency: `{ev.color_consistency}`\n",
+                f"- component_semantics: `{ev.component_semantics}`\n",
+                f"- tone_consistency: `{ev.tone_consistency}`\n",
+                f"- token_hit_rate: `{ev.token_hit_rate}` ({ev.token_hits}/{ev.token_total})\n",
+                f"- anti_pattern_penalty: `{ev.anti_pattern_penalty}`\n",
+                f"- selection_risk: `{ev.selection_risk}`\n",
+            ]
+            if ev.next_best_slug:
+                lines.append(f"- next_best_slug: `{ev.next_best_slug}`\n")
+            if ev.matched_anti_patterns:
+                lines.append("- matched_anti_patterns:\n")
+                lines.extend(f"  - {x}\n" for x in ev.matched_anti_patterns[:8])
+            if ev.repair_actions:
+                lines.append("- repair_actions:\n")
+                lines.extend(f"  - {x}\n" for x in ev.repair_actions[:8])
+            if ev.notes:
+                lines.append("- notes:\n")
+                lines.extend(f"  - {x}\n" for x in ev.notes[:8])
+            return BuiltinSlashOutcome(kind="assistant_message", assistant_text="".join(lines))
+        if sub == "why":
+            lines = [
+                "# UI style selection reason\n\n",
+                f"- mode: `{ctx.ui_style_mode or 'off'}`\n",
+                f"- selected: `{ctx.ui_style_selected or '(none)'}`\n",
+                f"- source: `{ctx.ui_style_source or '(unknown)'}`\n",
+                "\n## Detail\n\n",
+                f"{ctx.ui_style_reason or '(none)'}\n\n",
+            ]
+            if ctx.ui_style_top_candidates:
+                n = len(ctx.ui_style_top_candidates)
+                lines.append(f"- top_candidates (top {n} by raw score): ")
+                lines.append(", ".join(ctx.ui_style_top_candidates) + "\n")
+            return BuiltinSlashOutcome(kind="assistant_message", assistant_text="".join(lines))
+        return BuiltinSlashOutcome(
+            kind="assistant_message",
+            assistant_text=(
+                "Usage:\n"
+                "- `/ui-style on|off`\n"
+                "- `/ui-style set <slug>`\n"
+                "- `/ui-style auto`\n"
+                "- `/ui-style list [keyword]`\n"
+                "- `/ui-style show [slug]`\n"
+                "- `/ui-style eval [ui-output-text]`\n"
+                "- `/ui-style why`\n"
+            ),
         )
 
     if head == "permissions":

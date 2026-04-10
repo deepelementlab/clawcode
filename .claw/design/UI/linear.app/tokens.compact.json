@@ -1,0 +1,8 @@
+{
+  "primary_color": "#7170ff",
+  "background": "#08090a",
+  "text": "#f7f8f8",
+  "radius": "6px",
+  "shadow": "0px 8px 24px rgba(0,0,0,0.35)",
+  "font_family": "Inter Variable, Berkeley Mono"
+}

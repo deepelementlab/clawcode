@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Clay
+role_hint: Clay / GTM tooling
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Clay
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What makes Clay truly distinctive is its hover micro-animations: buttons on hove
 - Generous border radius: 24px cards, 40px sections, 1584px pills
 - Mixed border styles: solid + dashed in the same interface
 - Multi-layer shadow with inset highlight: `0px 1px 1px` + `-1px inset` + `-0.5px`
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Clay / GTM tooling** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

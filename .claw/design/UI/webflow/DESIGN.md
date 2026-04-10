@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Webflow
+role_hint: Webflow builder
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Webflow
 
 ## 1. Visual Theme & Atmosphere
@@ -13,6 +27,23 @@ Webflow's website is a visually rich, tool-forward platform that communicates "d
 - Multi-layer shadow stacks (5-layer cascading shadows)
 - Uppercase labels: 10px–15px, weight 500–600, wide letter-spacing (0.6px–1.5px)
 - translate(6px) hover animation on buttons
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Webflow builder** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

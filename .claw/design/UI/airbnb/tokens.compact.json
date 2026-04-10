@@ -1,0 +1,8 @@
+{
+  "primary_color": "#ff385c",
+  "background": "#ffffff",
+  "text": "#222222",
+  "radius": "20px",
+  "shadow": "0 0 0 1px rgba(0,0,0,0.02), 0 2px 6px rgba(0,0,0,0.04), 0 4px 8px rgba(0,0,0,0.1)",
+  "font_family": "Airbnb Cereal VF"
+}

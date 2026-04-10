@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: SpaceX
+role_hint: SpaceX aerospace
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: SpaceX
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What makes SpaceX distinctive is its radical minimalism: no shadows, no borders 
 - Single ghost button: `rgba(240,240,250,0.1)` background with spectral border
 - Full-viewport sections — each section is a cinematic "scene"
 - No decorative elements — every pixel serves the photography
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **SpaceX aerospace** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

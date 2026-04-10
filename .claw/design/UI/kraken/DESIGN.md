@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: Kraken
+role_hint: Kraken exchange
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: Kraken
 
 ## 1. Visual Theme & Atmosphere
@@ -11,6 +25,23 @@ Kraken's website is a clean, trustworthy crypto exchange that uses purple as its
 - 12px radius buttons (rounded but not pill)
 - Subtle shadows (`rgba(0,0,0,0.03) 0px 4px 24px`) — whisper-level
 - Green accent (`#149e61`) for positive/success states
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **Kraken exchange** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 

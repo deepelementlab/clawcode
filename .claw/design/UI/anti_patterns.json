@@ -1,0 +1,60 @@
+{
+  "global": [
+    {
+      "pattern": "rainbow gradient headline",
+      "severity": "medium",
+      "domains": ["developer_tooling", "saas"],
+      "surfaces": ["product_landing", "docs_marketing"],
+      "conflicts_with_tags": ["minimal_engineering", "monochrome"],
+      "rewrite_hint": "Use single primary accent and neutral typography hierarchy."
+    },
+    {
+      "pattern": "glassmorphism heavy blur",
+      "severity": "high",
+      "domains": ["developer_tooling"],
+      "surfaces": ["dashboard_shell"],
+      "conflicts_with_tags": ["shadow_border", "technical_premium"],
+      "rewrite_hint": "Replace blur cards with subtle border-shadow cards."
+    },
+    "excessive animation",
+    "neon glow borders",
+    {
+      "pattern": "multiple conflicting accent colors",
+      "severity": "high",
+      "rewrite_hint": "Limit accents to one primary and one semantic status color."
+    }
+  ],
+  "by_style": {
+    "vercel": [
+      {
+        "pattern": "skeuomorphic textures",
+        "severity": "high",
+        "conflicts_with_tags": ["minimal_engineering"],
+        "rewrite_hint": "Use flat monochrome surfaces with subtle depth."
+      },
+      "thick ornamental borders",
+      {
+        "pattern": "playful emoji-heavy hero copy",
+        "severity": "medium",
+        "rewrite_hint": "Use concise technical copy and product-first value framing."
+      }
+    ],
+    "linear.app": [
+      {
+        "pattern": "rounded cartoon cards",
+        "severity": "medium",
+        "rewrite_hint": "Use tighter radius and structured issue-tracking density."
+      },
+      "oversized marketing slogans",
+      "bright multi-color CTA palette"
+    ],
+    "airbnb": [
+      "dark-only monochrome palette",
+      {
+        "pattern": "dense enterprise dashboard grid",
+        "severity": "medium",
+        "rewrite_hint": "Increase whitespace and use lifestyle-oriented visual hierarchy."
+      }
+    ]
+  }
+}

@@ -58,6 +58,19 @@ from ..components.chat.right_panel_grip import (
     RightPanelWidthCommit,
     RightPanelWidthDrag,
 )
+from ..ui_style import (
+    derive_scene_tags,
+    load_ui_anti_patterns,
+    load_ui_anti_pattern_rules,
+    is_ui_intent,
+    ui_critic_checklist,
+    ui_style_auto_pick_top_n,
+    load_agent_scene_tags,
+    load_ui_catalog,
+    select_ui_style_auto,
+    style_prompt_prefix,
+    ui_catalog_candidate_hints,
+)
 from ..components.chat.sidebar import Sidebar
 from ..components.dialogs.display_mode import DisplayModeDialog
 from ..components.dialogs.file_picker import FileAttachment, FilePickerDialog
@@ -417,6 +430,11 @@ class ChatScreen(Screen):
         self._hud_turn_output_tokens: int = 0
         # Approximate output chars (fallback when provider gives no streaming usage).
         self._hud_turn_output_chars: int = 0
+        self._ui_style_mode: str = str(getattr(self.settings, "ui_style_mode", "off") or "off")
+        self._ui_style_selected: str = str(getattr(self.settings, "ui_style_default_slug", "") or "")
+        self._ui_style_source: str = "default" if self._ui_style_selected else ""
+        self._ui_style_reason: str = ""
+        self._ui_style_top_candidates: list[str] = []
 
         # Dirty-flag for batched HUD status bar refresh (avoids per-event full redraws).
         self._hud_dirty: bool = False
@@ -982,6 +1000,28 @@ class ChatScreen(Screen):
             pass
         return message_list
 
+    def _ui_display_version(self) -> str:
+        """Version text shown in TUI surfaces.
+
+        Priority:
+        1) `.clawcode.json` -> `tui.display_version` (when non-empty)
+        2) installed package version
+        3) "dev"
+        """
+        try:
+            tui_cfg = getattr(self.settings, "tui", None)
+            cfg_val = str(getattr(tui_cfg, "display_version", "") or "").strip()
+            if cfg_val:
+                return cfg_val
+        except Exception:
+            pass
+        try:
+            from importlib.metadata import version
+
+            return version("clawcode")
+        except Exception:
+            return "dev"
+
     async def _build_welcome_context(self, session_id: str):
         """Gather model, workspace hint, recent sessions, and theme for the welcome panel."""
         from pathlib import Path
@@ -991,7 +1031,6 @@ class ChatScreen(Screen):
         from ..welcome_banner import (
             RecentSessionItem,
             WelcomeContext,
-            package_version,
             welcome_style_from_chrome,
         )
 
@@ -1029,7 +1068,7 @@ class ChatScreen(Screen):
             pass
 
         return WelcomeContext(
-            version=package_version(),
+            version=self._ui_display_version(),
             model_label=model_label,
             workspace_hint=hint,
             style=style,
@@ -1358,13 +1397,7 @@ class ChatScreen(Screen):
             if len(cwd) > 40:
                 cwd = "..." + cwd[-39:]
 
-            # App version (fallback to "dev" when not installed)
-            try:
-                from importlib.metadata import version
-
-                app_version = version("clawcode")
-            except Exception:
-                app_version = "dev"
+            app_version = self._ui_display_version()
 
             # Auto-compact + LSP status
             auto_compact = getattr(self.settings, "auto_compact", True)
@@ -2057,12 +2090,7 @@ class ChatScreen(Screen):
             return
 
         # Version
-        try:
-            from importlib.metadata import version
-
-            app_version = version("clawcode")
-        except Exception:
-            app_version = "dev"
+        app_version = self._ui_display_version()
 
         # cwd
         cwd = getattr(self.settings, "working_directory", "") or ""
@@ -2730,12 +2758,7 @@ class ChatScreen(Screen):
         else:
             provider_label = "anthropic"
 
-        try:
-            from importlib.metadata import version
-
-            app_version = version("clawcode")
-        except Exception:
-            app_version = "dev"
+        app_version = self._ui_display_version()
 
         cwd = str(getattr(self.settings, "working_directory", "") or "").strip() or "."
         working_dir_display = cwd if len(cwd) <= 56 else "..." + cwd[-53:]
@@ -2799,6 +2822,11 @@ class ChatScreen(Screen):
             plan_background_tasks=plan_background_tasks,
             plan_blocks_claw=plan_blocks_claw,
             claw_mode_enabled=bool(getattr(self, "_claw_mode_enabled", False)),
+            ui_style_mode=str(getattr(self, "_ui_style_mode", "off") or "off"),
+            ui_style_selected=str(getattr(self, "_ui_style_selected", "") or ""),
+            ui_style_reason=str(getattr(self, "_ui_style_reason", "") or ""),
+            ui_style_top_candidates=list(getattr(self, "_ui_style_top_candidates", []) or []),
+            ui_style_source=str(getattr(self, "_ui_style_source", "") or ""),
         )
 
     def _clawteam_loop_store(self) -> dict[str, dict[str, Any]]:
@@ -3028,6 +3056,25 @@ class ChatScreen(Screen):
                 ),
                 timeout=180.0,
             )
+            # Apply state patches emitted by slash handlers (non-agent side effects).
+            try:
+                ui_style_patch = (
+                    dict(outcome.routing_meta.get("ui_style", {}))
+                    if isinstance(getattr(outcome, "routing_meta", None), dict)
+                    else {}
+                )
+            except Exception:
+                ui_style_patch = {}
+            if ui_style_patch:
+                mode = str(ui_style_patch.get("mode", "")).strip().lower()
+                if mode in ("on", "off"):
+                    self._ui_style_mode = mode
+                if "selected" in ui_style_patch:
+                    self._ui_style_selected = str(ui_style_patch.get("selected", "")).strip()
+                if "source" in ui_style_patch:
+                    self._ui_style_source = str(ui_style_patch.get("source", "")).strip()
+                if "reason" in ui_style_patch:
+                    self._ui_style_reason = str(ui_style_patch.get("reason", "")).strip()
             if outcome.ui_action == "enable_claw_mode":
                 self._claw_mode_enabled = True
                 outcome.ui_action = None
@@ -3604,6 +3651,78 @@ class ChatScreen(Screen):
                         self._refresh_slash_skill_autocomplete()
                     return
                 content_for_agent = slash.llm_user_text
+
+        # UI style gating and prompt prefixing for normal user messages.
+        if not raw_content.startswith("/") and is_ui_intent(content_for_agent):
+            _ui_host = str(getattr(self.settings, "cli_launch_directory", "") or "").strip() or None
+            wd_ui = self.settings.working_directory or "."
+            styles = load_ui_catalog(wd_ui, cli_launch_directory=_ui_host)
+            selected_slug = (self._ui_style_selected or "").strip()
+            if self._ui_style_mode == "on" and not selected_slug:
+                scene_tags: list[str] = derive_scene_tags(content_for_agent)
+                scene_tags.extend(load_agent_scene_tags(wd_ui, cli_launch_directory=_ui_host))
+                dm = str(self._display_mode or "").lower()
+                if dm in ("opencode", "clawcode", "claude"):
+                    scene_tags.append("component_architecture")
+                pick = select_ui_style_auto(
+                    content_for_agent,
+                    styles,
+                    scene_tags=scene_tags,
+                    preferred_slug=str(getattr(self.settings, "ui_style_default_slug", "") or ""),
+                )
+                if pick is not None:
+                    # Always adopt highest raw-score style; confidence is informational only.
+                    self._ui_style_selected = pick.slug
+                    self._ui_style_source = "auto"
+                    n = ui_style_auto_pick_top_n()
+                    detail_parts = [pick.reason, pick.rubric]
+                    if pick.top_scores_preview:
+                        detail_parts.append(f"Top-{n} 原始分: {pick.top_scores_preview}")
+                    self._ui_style_reason = "\n\n".join(p for p in detail_parts if p)
+                    self._ui_style_top_candidates = list(pick.top_candidates)
+                    selected_slug = pick.slug
+                    try:
+                        self.notify(
+                            f"UI style auto-selected: `{pick.slug}` (confidence `{pick.confidence}`). "
+                            f"`/ui-style why` — 标准与 Top-{n} 分数。",
+                            timeout=5,
+                        )
+                    except Exception:
+                        pass
+                elif not styles:
+                    message_list = self._ensure_message_list(self.current_session_id)
+                    message_list.display = True
+                    att_names = [a.name for a in attachments] if attachments else None
+                    message_list.add_user_message(display_content, att_names)
+                    message_list.start_assistant_message()
+                    hints = ui_catalog_candidate_hints(wd_ui, cli_launch_directory=_ui_host)
+                    hint_lines = "\n".join(f"- `{p}`" for p in hints[:3])
+                    message_list.update_content(
+                        "UI style mode is **on**, but no style catalog is available.\n"
+                        "Run `/ui-style off` to bypass.\n"
+                        "Catalog lookup paths:\n"
+                        f"{hint_lines}\n"
+                        "If none exists, generate it with: `py -3 scripts/build_ui_style_catalog.py`."
+                    )
+                    message_list.finalize_message()
+                    input_widget.clear()
+                    try:
+                        input_widget.focus()
+                    except Exception:
+                        pass
+                    return
+            if selected_slug and styles:
+                entry = next((s for s in styles if s.slug == selected_slug), None)
+                if entry is not None:
+                    anti = load_ui_anti_patterns(wd_ui, slug=entry.slug, cli_launch_directory=_ui_host)
+                    anti_rules = load_ui_anti_pattern_rules(
+                        wd_ui, slug=entry.slug, cli_launch_directory=_ui_host
+                    )
+                    content_for_agent = (
+                        style_prompt_prefix(entry)
+                        + ui_critic_checklist(entry, anti_patterns=anti, anti_rules=anti_rules)
+                        + content_for_agent
+                    )
 
         self._finalize_send_after_input(
             display_content=display_content,

@@ -95,8 +95,15 @@ def cli(
     logger = logger.bind(debug=debug)
 
     try:
+        launch_cwd = str(Path.cwd().resolve())
         working_dir = str(cwd) if cwd else ""
-        app_ctx = asyncio.run(create_app(working_dir=working_dir or None, debug=debug))
+        app_ctx = asyncio.run(
+            create_app(
+                working_dir=working_dir or None,
+                debug=debug,
+                launch_working_directory=launch_cwd,
+            )
+        )
 
         logger.info(
             "ClawCode initialized",
@@ -171,8 +178,11 @@ def plugin() -> None:
 @click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
 def plugin_list(cwd: Path | None) -> None:
     """List installed plugins."""
+    launch_cwd = str(Path.cwd().resolve())
     working_dir = str(cwd) if cwd else ""
-    app_ctx = asyncio.run(create_app(working_dir=working_dir or None))
+    app_ctx = asyncio.run(
+        create_app(working_dir=working_dir or None, launch_working_directory=launch_cwd)
+    )
     pm = getattr(app_ctx, "plugin_manager", None)
     if pm is None:
         click.echo("Plugin system not initialized.")
@@ -195,8 +205,11 @@ def plugin_list(cwd: Path | None) -> None:
 @click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
 def plugin_install(path: Path, cwd: Path | None) -> None:
     """Install a plugin from a local directory."""
+    launch_cwd = str(Path.cwd().resolve())
     working_dir = str(cwd) if cwd else ""
-    app_ctx = asyncio.run(create_app(working_dir=working_dir or None))
+    app_ctx = asyncio.run(
+        create_app(working_dir=working_dir or None, launch_working_directory=launch_cwd)
+    )
     pm = getattr(app_ctx, "plugin_manager", None)
     if pm is None:
         click.echo("Plugin system not initialized.")
@@ -213,8 +226,11 @@ def plugin_install(path: Path, cwd: Path | None) -> None:
 @click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
 def plugin_enable(name: str, cwd: Path | None) -> None:
     """Enable a disabled plugin."""
+    launch_cwd = str(Path.cwd().resolve())
     working_dir = str(cwd) if cwd else ""
-    app_ctx = asyncio.run(create_app(working_dir=working_dir or None))
+    app_ctx = asyncio.run(
+        create_app(working_dir=working_dir or None, launch_working_directory=launch_cwd)
+    )
     pm = getattr(app_ctx, "plugin_manager", None)
     if pm is None:
         click.echo("Plugin system not initialized.")
@@ -230,8 +246,11 @@ def plugin_enable(name: str, cwd: Path | None) -> None:
 @click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
 def plugin_disable(name: str, cwd: Path | None) -> None:
     """Disable a plugin."""
+    launch_cwd = str(Path.cwd().resolve())
     working_dir = str(cwd) if cwd else ""
-    app_ctx = asyncio.run(create_app(working_dir=working_dir or None))
+    app_ctx = asyncio.run(
+        create_app(working_dir=working_dir or None, launch_working_directory=launch_cwd)
+    )
     pm = getattr(app_ctx, "plugin_manager", None)
     if pm is None:
         click.echo("Plugin system not initialized.")

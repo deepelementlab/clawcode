@@ -1,3 +1,17 @@
+---
+# Human review: fill arrays; remove this comment line after review if desired.
+title: IBM
+role_hint: IBM enterprise / design language
+styleTags: []
+fitDomains: []
+fitSurfaces: []
+avoidSurfaces: []
+toneKeywords: []
+density: ""
+visualEnergy: ""
+migration: "frontmatter_template_v1"
+---
+
 # Design System: IBM
 
 ## 1. Visual Theme & Atmosphere
@@ -17,6 +31,23 @@ What defines IBM's visual identity beyond monochrome-plus-blue is the reliance o
 - Flat, borderless cards on `#f4f4f4` Gray 10 surface — depth through background-color layering, not shadows
 - Bottom-border inputs (not boxed) — the signature Carbon form pattern
 - 0px border-radius on primary buttons — unapologetically rectangular, no softening
+
+## 1.5 Aesthetic Fit & Use Cases
+
+### Core Formula
+<!-- TODO_REVIEW: one line synthesizing the §1 visual recipe -->
+
+### Best For
+- Catalog role: **IBM enterprise / design language** — refine into concrete surfaces, domains, and agent scenarios.
+
+### Not Ideal For
+- <!-- TODO_REVIEW: contexts that clash with this aesthetic -->
+
+### Experience Goal
+<!-- TODO_REVIEW: one sentence on the intended user feeling -->
+
+### Style Tags
+`TODO_REVIEW` — align with `styleTags` in YAML frontmatter when you fill it.
 
 ## 2. Color Palette & Roles
 
