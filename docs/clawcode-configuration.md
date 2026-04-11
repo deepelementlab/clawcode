@@ -1,6 +1,6 @@
 # ClawCode — Configuration & Usage Guide
 
-This document describes how to configure and run **ClawCode** (the `clawcode/` package in this repository). It focuses on `.clawcode.json`, workspace metadata directories, environment variables, and everyday usage. For feature overview and philosophy, see [`clawcode/README.md`](../../../clawcode/README.md).
+This document describes how to configure and run **ClawCode** (the `clawcode/` package in this repository). It focuses on `.clawcode.json`, workspace metadata directories, environment variables, and everyday usage. For feature overview and philosophy, see [`clawcode/README.md`](../clawcode/README.md).
 
 ---
 
@@ -374,10 +374,10 @@ Use `.env` in the project root for local overrides without exporting globals.
 
 | Topic | Location |
 |-------|----------|
-| Project overview & quick start | [`clawcode/README.md`](../../../clawcode/README.md) |
-| Primary storage root (`.claw`) | [`clawcode/.claw/README.md`](../../../clawcode/.claw/README.md) |
-| Default data dir (`.clawcode`) | [`clawcode/.clawcode/README.md`](../../../clawcode/.clawcode/README.md) |
-| Claude-compatible tree | [`clawcode/.claude/README.md`](../../../clawcode/.claude/README.md) |
+| Project overview & quick start | [`clawcode/README.md`](../README.md) |
+| Primary storage root (`.claw`) | [`clawcode/.claw/README.md`](../.claw/README.md) |
+| Default data dir (`.clawcode`) | [`clawcode/.clawcode/README.md`](../.clawcode/README.md) |
+| Claude-compatible tree | [`clawcode/.claude/README.md`](../.claude/README.md) |
 | Settings schema (source of truth) | `clawcode/clawcode/config/settings.py` |
 | Storage merge order | `clawcode/clawcode/storage_paths.py` |
 
