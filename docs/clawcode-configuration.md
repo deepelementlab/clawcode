@@ -1,6 +1,6 @@
 # ClawCode — Configuration & Usage Guide
 
-This document describes how to configure and run **ClawCode** (the `clawcode/` package in this repository). It focuses on `.clawcode.json`, workspace metadata directories, environment variables, and everyday usage. For feature overview and philosophy, see [`clawcode/README.md`](../clawcode/README.md).
+This document describes how to configure and run **ClawCode** (the `clawcode/` package in this repository). It focuses on `.clawcode.json`, workspace metadata directories, environment variables, and everyday usage. For feature overview and philosophy, see [`clawcode/README.md`](../README.md).
 
 ---
 
