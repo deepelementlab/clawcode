@@ -90,6 +90,7 @@ class Broker(Generic[T]):
         self._running = False
         self._task: asyncio.Task[None] | None = None
         self._max_buffer_size = max_buffer_size
+        self._notify: asyncio.Event = asyncio.Event()
 
     def subscribe(
         self,
@@ -163,8 +164,10 @@ class Broker(Generic[T]):
                     queue.put_nowait(event)
                     count += 1
                 except asyncio.QueueFull:
-                    # Subscriber queue is full, skip
                     pass
+
+        if count > 0:
+            self._notify.set()
 
         return count
 
@@ -194,29 +197,23 @@ class Broker(Generic[T]):
             self._task = None
 
     async def _process_events(self) -> None:
-        """Process events from the internal queue.
-
-        This method runs the event distribution loop, reading events
-        from subscribers' queues and calling their handlers.
-        """
+        """Process events from subscriber queues, driven by asyncio.Event."""
         tasks: set[asyncio.Task[None]] = set()
 
         try:
             while self._running:
-                # Collect events from all subscriber queues
+                await self._notify.wait()
+                self._notify.clear()
+
                 for handler, queue in self._subscribers.items():
-                    if not queue.empty():
+                    while not queue.empty():
                         event = queue.get_nowait()
                         if event is not None:
                             task = asyncio.create_task(handler(event))
                             tasks.add(task)
                             task.add_done_callback(tasks.discard)
 
-                # Wait a bit before next iteration
-                await asyncio.sleep(0.01)
-
         except asyncio.CancelledError:
-            # Cancel all pending handler tasks
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)

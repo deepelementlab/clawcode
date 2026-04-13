@@ -310,8 +310,11 @@ class OpenAIProvider(BaseProvider):
         # Prepare request parameters
         request_params = self._build_request_params(messages, tools, stream=False)
 
-        # Make request
-        response = await self._client.chat.completions.create(**request_params)
+        # Make request with retry
+        async def _do_call():
+            return await self._client.chat.completions.create(**request_params)
+
+        response = await self._with_retry(_do_call)
 
         # Parse response
         message = response.choices[0].message
@@ -418,8 +421,11 @@ class OpenAIProvider(BaseProvider):
         # Prepare request parameters for streaming
         request_params = self._build_request_params(messages, tools, stream=True)
 
-        # Stream response
-        stream = await self._client.chat.completions.create(**request_params)
+        # Stream response with retry on connection init
+        async def _start_stream():
+            return await self._client.chat.completions.create(**request_params)
+
+        stream = await self._with_retry(_start_stream)
 
         content_buffer = []
         thinking_buffer = []
@@ -484,7 +490,7 @@ class OpenAIProvider(BaseProvider):
                         tool_calls_buffer[buf_key] = {
                             "id": buf_key,
                             "name": "",
-                            "arguments": "",
+                            "arguments_chunks": [],
                         }
                         yield ProviderEvent.tool_use_start(
                             ToolCall(id=buf_key, name="", input={})
@@ -494,14 +500,17 @@ class OpenAIProvider(BaseProvider):
                         if tc.function.name:
                             tool_calls_buffer[buf_key]["name"] = tc.function.name
                         if tc.function.arguments:
-                            tool_calls_buffer[buf_key]["arguments"] += tc.function.arguments
+                            tool_calls_buffer[buf_key]["arguments_chunks"].append(
+                                tc.function.arguments
+                            )
 
         # Convert tool calls
         tool_calls = []
         for tc_data in tool_calls_buffer.values():
             if tc_data["name"]:
+                arguments = "".join(tc_data["arguments_chunks"])
                 try:
-                    args = self._parse_arguments(tc_data["arguments"])
+                    args = self._parse_arguments(arguments)
                 except Exception:
                     args = {}
 

@@ -209,11 +209,13 @@ async def fetch_pr_comments(pr: PrRef) -> dict[str, Any]:
 
     owner, repo, num = pr.owner, pr.repo, pr.number
     base = f"{GITHUB_API}/repos/{owner}/{repo}"
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        pull = await _get_json(client, f"{base}/pulls/{num}", headers)
-        issue_comments = await _get_json(client, f"{base}/issues/{num}/comments", headers)
-        review_comments = await _get_json(client, f"{base}/pulls/{num}/comments", headers)
-        reviews = await _get_json(client, f"{base}/pulls/{num}/reviews", headers)
+    from ..core.http_pool import get_shared_http_client
+
+    client = await get_shared_http_client()
+    pull = await _get_json(client, f"{base}/pulls/{num}", headers)
+    issue_comments = await _get_json(client, f"{base}/issues/{num}/comments", headers)
+    review_comments = await _get_json(client, f"{base}/pulls/{num}/comments", headers)
+    reviews = await _get_json(client, f"{base}/pulls/{num}/reviews", headers)
 
     return {
         "pull": pull,
@@ -236,9 +238,11 @@ async def fetch_pr_review_context(
 
     owner, repo, num = pr.owner, pr.repo, pr.number
     base = f"{GITHUB_API}/repos/{owner}/{repo}"
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        pull = await _get_json(client, f"{base}/pulls/{num}", headers)
-        files = await _get_json(client, f"{base}/pulls/{num}/files?per_page=100", headers)
+    from ..core.http_pool import get_shared_http_client_with_timeout
+
+    client = await get_shared_http_client_with_timeout(45.0)
+    pull = await _get_json(client, f"{base}/pulls/{num}", headers)
+    files = await _get_json(client, f"{base}/pulls/{num}/files?per_page=100", headers)
 
     file_list = files if isinstance(files, list) else []
     chunks: list[str] = []

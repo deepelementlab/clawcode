@@ -607,6 +607,9 @@ class Settings(BaseSettings):
     #: one assistant turn via asyncio.gather.  See docs/PARALLEL_TOOL_CALLS.md.
     parallel_tool_calls: bool = True
 
+    max_concurrent_tools: int = 5
+    max_concurrent_subagents: int = 3
+
     # Context paths for loading project instructions
     context_paths: list[str] = Field(default_factory=lambda: list(DEFAULT_CONTEXT_PATHS))
 

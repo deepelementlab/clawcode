@@ -207,7 +207,7 @@ TEST_TOOLS = set(READ_ONLY_TOOLS)
 REVIEW_TOOLS = {"view", "ls", "glob", "grep", "diagnostics"}
 
 DEFAULT_MAX_ITERATIONS = 20
-DEFAULT_TIMEOUT_MS = 120000
+DEFAULT_TIMEOUT_MS = 300000
 
 
 class IsolationMode(str, Enum):
@@ -419,33 +419,36 @@ class SubAgent:
     async def _setup_worktree(self, worktree_path: Path) -> None:
         import subprocess
 
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--show-toplevel"],
-                cwd=self._context.working_directory,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                logger.error("Not a git repository: %s", result.stderr)
-                return
-            repo_root = Path(result.stdout.strip())
-            worktree_path.parent.mkdir(parents=True, exist_ok=True)
-            branch_name = f"subagent-{self._context.session_id}"
-            add = subprocess.run(
-                ["git", "worktree", "add", str(worktree_path), "-b", branch_name],
-                cwd=str(repo_root),
-                capture_output=True,
-                text=True,
-            )
-            if add.returncode != 0:
-                logger.error("Failed to create worktree: %s", add.stderr)
-                return
-            self._isolation_worktree_path = worktree_path
-            self._isolation_branch = branch_name
-            logger.debug("Created worktree at %s", worktree_path)
-        except Exception as e:
-            logger.error("Error creating worktree: %s", e)
+        def _sync() -> None:
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    cwd=self._context.working_directory,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    logger.error("Not a git repository: %s", result.stderr)
+                    return
+                repo_root = Path(result.stdout.strip())
+                worktree_path.parent.mkdir(parents=True, exist_ok=True)
+                branch_name = f"subagent-{self._context.session_id}"
+                add = subprocess.run(
+                    ["git", "worktree", "add", str(worktree_path), "-b", branch_name],
+                    cwd=str(repo_root),
+                    capture_output=True,
+                    text=True,
+                )
+                if add.returncode != 0:
+                    logger.error("Failed to create worktree: %s", add.stderr)
+                    return
+                self._isolation_worktree_path = worktree_path
+                self._isolation_branch = branch_name
+                logger.debug("Created worktree at %s", worktree_path)
+            except Exception as e:
+                logger.error("Error creating worktree: %s", e)
+
+        await asyncio.to_thread(_sync)
 
     async def _cleanup_worktree(self, force: bool = False) -> None:
         if not self._isolation_worktree_path:
@@ -456,38 +459,42 @@ class SubAgent:
         path = self._isolation_worktree_path
         branch = self._isolation_branch
         repo_cwd = self._context.working_directory
-        try:
-            args = ["git", "worktree", "remove", str(path)]
-            if force:
-                args.append("-f")
-            result = subprocess.run(
-                args,
-                cwd=repo_cwd,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                rm = subprocess.run(
-                    ["git", "worktree", "remove", "-f", str(path)],
+
+        def _sync() -> None:
+            try:
+                args = ["git", "worktree", "remove", str(path)]
+                if force:
+                    args.append("-f")
+                result = subprocess.run(
+                    args,
                     cwd=repo_cwd,
                     capture_output=True,
                     text=True,
                 )
-                if rm.returncode != 0:
-                    logger.error("Failed to remove worktree: %s", rm.stderr)
-                    shutil.rmtree(path, ignore_errors=True)
-            if branch:
-                subprocess.run(
-                    ["git", "branch", "-D", branch],
-                    cwd=repo_cwd,
-                    capture_output=True,
-                    text=True,
-                )
-        except Exception as e:
-            logger.warning("Error cleaning worktree: %s", e)
-        finally:
-            self._isolation_worktree_path = None
-            self._isolation_branch = None
+                if result.returncode != 0:
+                    rm = subprocess.run(
+                        ["git", "worktree", "remove", "-f", str(path)],
+                        cwd=repo_cwd,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if rm.returncode != 0:
+                        logger.error("Failed to remove worktree: %s", rm.stderr)
+                        shutil.rmtree(path, ignore_errors=True)
+                if branch:
+                    subprocess.run(
+                        ["git", "branch", "-D", branch],
+                        cwd=repo_cwd,
+                        capture_output=True,
+                        text=True,
+                    )
+            except Exception as e:
+                logger.warning("Error cleaning worktree: %s", e)
+            finally:
+                self._isolation_worktree_path = None
+                self._isolation_branch = None
+
+        await asyncio.to_thread(_sync)
 
     async def run(self) -> AsyncIterator[Any]:
         from ..agent import Agent, AgentEvent, AgentEventType
@@ -515,13 +522,18 @@ class SubAgent:
                     "allowed_tools": self._context.allowed_tools,
                 }
                 try:
-                    await self._hook_engine.fire(
-                        HookEvent.SubagentStart,
-                        context=hook_context,
-                        provider=self._provider,
-                        working_directory=self._context.working_directory,
-                        suppress_agent_hooks=False,
+                    await asyncio.wait_for(
+                        self._hook_engine.fire(
+                            HookEvent.SubagentStart,
+                            context=hook_context,
+                            provider=self._provider,
+                            working_directory=self._context.working_directory,
+                            suppress_agent_hooks=False,
+                        ),
+                        timeout=10.0,
                     )
+                except asyncio.TimeoutError:
+                    logger.warning("SubagentStart hook timed out (10s)")
                 except Exception as e:
                     logger.warning("SubagentStart hook failed: %s", e)
 
@@ -661,29 +673,34 @@ class SubAgent:
 
             if self._hook_engine:
                 try:
-                    await self._hook_engine.fire(
-                        HookEvent.SubagentStop,
-                        context={
-                            "subagent_id": self._context.session_id,
-                            "subagent_type": self._context.subagent_type.value,
-                            "agent_key": self._context.agent_key,
-                            "task": self._context.task,
-                            "session_id": self._context.session_id,
-                            "result": self._result.to_dict() if self._result else None,
-                            "success": self._is_complete,
-                            "duration_ms": duration_ms,
-                            "tool_calls": self._tool_call_count,
-                            "token_usage": self._result.token_usage if self._result else {},
-                            "isolation_mode": self._context.isolation_mode.value,
-                            "isolation_worktree_path": str(self._isolation_worktree_path)
-                            if self._isolation_worktree_path
-                            else None,
-                            "isolation_branch": self._isolation_branch,
-                        },
-                        provider=self._provider,
-                        working_directory=self._context.working_directory,
-                        suppress_agent_hooks=False,
+                    await asyncio.wait_for(
+                        self._hook_engine.fire(
+                            HookEvent.SubagentStop,
+                            context={
+                                "subagent_id": self._context.session_id,
+                                "subagent_type": self._context.subagent_type.value,
+                                "agent_key": self._context.agent_key,
+                                "task": self._context.task,
+                                "session_id": self._context.session_id,
+                                "result": self._result.to_dict() if self._result else None,
+                                "success": self._is_complete,
+                                "duration_ms": duration_ms,
+                                "tool_calls": self._tool_call_count,
+                                "token_usage": self._result.token_usage if self._result else {},
+                                "isolation_mode": self._context.isolation_mode.value,
+                                "isolation_worktree_path": str(self._isolation_worktree_path)
+                                if self._isolation_worktree_path
+                                else None,
+                                "isolation_branch": self._isolation_branch,
+                            },
+                            provider=self._provider,
+                            working_directory=self._context.working_directory,
+                            suppress_agent_hooks=False,
+                        ),
+                        timeout=10.0,
                     )
+                except asyncio.TimeoutError:
+                    logger.warning("SubagentStop hook timed out (10s)")
                 except Exception as e:
                     logger.warning("SubagentStop hook failed: %s", e)
 
@@ -994,7 +1011,7 @@ class AgentTool(BaseTool):
             agent_key=key,
             custom_system_prompt=dfn.prompt or None,
             subagent_model=dfn.model,
-            iteration_budget=getattr(context, "iteration_budget", None),
+            iteration_budget=None,
         )
 
         subagent = SubAgent(

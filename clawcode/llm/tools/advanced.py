@@ -1232,41 +1232,38 @@ class FetchTool(BaseTool):
             )
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                # Make request
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    headers=headers,
-                    content=body,
-                )
+            from ...core.http_pool import get_shared_http_client
 
-                # Get response content
-                content_type = response.headers.get("content-type", "")
+            client = await get_shared_http_client()
+            response = await client.request(
+                method=method,
+                url=url,
+                headers=headers,
+                content=body,
+            )
 
-                if "application/json" in content_type:
-                    # Return JSON as formatted string
-                    import json
+            content_type = response.headers.get("content-type", "")
 
-                    try:
-                        content = json.dumps(response.json(), indent=2)
-                    except Exception:
-                        content = response.text[:max_size]
-                else:
-                    # Truncate if too large
+            if "application/json" in content_type:
+                import json
+
+                try:
+                    content = json.dumps(response.json(), indent=2)
+                except Exception:
                     content = response.text[:max_size]
-                    if len(response.text) > max_size:
-                        content += "\n... (truncated)"
+            else:
+                content = response.text[:max_size]
+                if len(response.text) > max_size:
+                    content += "\n... (truncated)"
 
-                # Format response info
-                info = f"Status: {response.status_code}\n"
-                info += f"Content-Type: {content_type}\n"
-                info += f"Size: {len(response.text)} bytes\n"
+            info = f"Status: {response.status_code}\n"
+            info += f"Content-Type: {content_type}\n"
+            info += f"Size: {len(response.text)} bytes\n"
 
-                return ToolResponse(
-                    content=sanitize_text(f"{info}\n{content}"),
-                    metadata=f"{response.status_code} {len(response.text)} bytes",
-                )
+            return ToolResponse(
+                content=sanitize_text(f"{info}\n{content}"),
+                metadata=f"{response.status_code} {len(response.text)} bytes",
+            )
 
         except httpx.TimeoutException:
             return ToolResponse(
@@ -1909,10 +1906,12 @@ class SourcegraphTool(BaseTool):
         """
         payload = {"query": gql, "variables": {"query": query, "limit": limit}}
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+        from ...core.http_pool import get_shared_http_client
+
+        client = await get_shared_http_client()
+        resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
 
         errors = data.get("errors")
         if errors:

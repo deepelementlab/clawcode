@@ -228,17 +228,29 @@ _logger = logging.getLogger(__name__)
 
 def _normalize_tool_message_sequences_for_api(
     messages: list[dict[str, Any]],
+    *,
+    start_from: int = 0,
 ) -> None:
     """Ensure strict OpenAI / DeepSeek ordering: one ``tool`` row per ``tool_calls[].id``.
 
     Rebuilds the in-place list so that after each assistant message with ``tool_calls``,
     tool responses appear in the same order as ``tool_calls``, padding synthetic rows
     when results are missing or ids were reordered.
+
+    When ``start_from`` is given, only messages from that index onward are rescanned;
+    earlier messages are left untouched.
     """
+    if start_from <= 0:
+        prefix: list[dict[str, Any]] = []
+        tail = messages
+    else:
+        prefix = list(messages[:start_from])
+        tail = messages[start_from:]
+
     i = 0
     out: list[dict[str, Any]] = []
-    while i < len(messages):
-        m = messages[i]
+    while i < len(tail):
+        m = tail[i]
         if m.get("role") == "assistant" and m.get("tool_calls"):
             out.append(m)
             required: list[str] = []
@@ -247,8 +259,8 @@ def _normalize_tool_message_sequences_for_api(
                     required.append(str(tc["id"]))
             i += 1
             bodies: dict[str, list[str]] = defaultdict(list)
-            while i < len(messages) and messages[i].get("role") == "tool":
-                row = messages[i]
+            while i < len(tail) and tail[i].get("role") == "tool":
+                row = tail[i]
                 tid = str(row.get("tool_call_id") or "")
                 bodies[tid].append(str(row.get("content") if row.get("content") is not None else ""))
                 i += 1
@@ -266,7 +278,7 @@ def _normalize_tool_message_sequences_for_api(
             continue
         out.append(m)
         i += 1
-    messages[:] = out
+    messages[:] = prefix + out
 
 
 def _persisted_tool_result_dict(
@@ -403,6 +415,11 @@ class Agent:
         self._provider_messages_cache_len: int = 0
         self._last_flush_time: float = 0.0
         self._flush_cooldown: float = 60.0
+        self._YIELD_INTERVAL: float = 0.05
+        _max_tools = int(getattr(settings, "max_concurrent_tools", 5)) if settings else 5
+        _max_sub = int(getattr(settings, "max_concurrent_subagents", 3)) if settings else 3
+        self._tool_semaphore = asyncio.Semaphore(max(1, _max_tools))
+        self._subagent_semaphore = asyncio.Semaphore(max(1, _max_sub))
 
     def _reset_closed_loop_metrics(self) -> None:
         """Per-run observability counters for closed-loop behavior."""
@@ -706,7 +723,6 @@ class Agent:
                     tool_calls: list[ToolCall] = []
                     stream_failed: str | None = None
                     _last_yield_time = time.monotonic()
-                    _YIELD_INTERVAL = 0.05
 
                     async for event in self._provider.stream_response(
                         provider_messages, tool_schemas
@@ -723,7 +739,7 @@ class Agent:
                                 assistant_msg.parts.append(TextContent(content=delta))
                                 yield AgentEvent.content_delta(delta)
                                 now = time.monotonic()
-                                if now - _last_yield_time >= _YIELD_INTERVAL:
+                                if now - _last_yield_time >= self._YIELD_INTERVAL:
                                     await asyncio.sleep(0)
                                     _last_yield_time = now
 
@@ -737,7 +753,7 @@ class Agent:
                                     content=thinking,
                                 )
                                 now = time.monotonic()
-                                if now - _last_yield_time >= _YIELD_INTERVAL:
+                                if now - _last_yield_time >= self._YIELD_INTERVAL:
                                     await asyncio.sleep(0)
                                     _last_yield_time = now
 
@@ -774,9 +790,8 @@ class Agent:
                     if stream_failed is not None:
                         break
 
-                    await self._message_service.update(assistant_msg)
-
                     if tool_calls:
+                        await self._message_service.update(assistant_msg)
                         results: list[dict[str, Any]] = []
                         async for evt in self._iter_tool_events(
                             session_id,
@@ -846,6 +861,7 @@ class Agent:
                         continue
 
                     # --- Hook: Stop (normal completion) ---
+                    await self._message_service.update(assistant_msg)
                     if self._hook_engine:
                         await self._hook_engine.fire(
                             HookEvent.Stop,
@@ -914,14 +930,22 @@ class Agent:
                     pass
             self._active_requests.pop(session_id, None)
 
-    _READ_ONLY_TOOLS = frozenset({"view", "ls", "glob", "grep", "diagnostics"})
+    _READ_ONLY_TOOLS = frozenset({
+        "view", "ls", "glob", "grep", "diagnostics",
+        "search", "batch_view", "rg",
+    })
 
     def _should_parallelize_tool_calls(self, tool_calls: list[ToolCall]) -> bool:
         """True when parallel gather is allowed for this batch of tool calls.
 
-        When ``permission_client`` is set (TUI), only batches consisting
-        entirely of read-only tools are eligible — those tools never trigger
-        a permission modal so parallel execution is safe.
+        Parallelizable scenarios:
+        1. All read-only tools (no permission modal needed)
+        2. All AgentTool/subagent calls (independent sub-tasks)
+        3. Tools with session-scoped permission pre-approval (skip serial modal)
+        4. Mixed read-only + subagent calls (when no permission_client)
+
+        Streaming tools always force serial execution.
+        Mixed AgentTool + non-parallelizable non-subagent tools force serial.
         """
         if len(tool_calls) < 2:
             return False
@@ -930,17 +954,50 @@ class Agent:
             return False
         from .tools.subagent import AgentTool
 
+        has_subagent = False
+        has_streaming = False
+        has_non_parallelizable = False
+
         for tc in tool_calls:
             t = self._tools.get(tc.name)
             if t is None:
                 return False
             if isinstance(t, AgentTool):
-                return False
+                has_subagent = True
+                continue
             if hasattr(t, "run_stream") and callable(getattr(t, "run_stream")):
-                return False
+                has_streaming = True
+                continue
             if self._permission_client is not None and tc.name not in self._READ_ONLY_TOOLS:
-                return False
+                if not self._is_session_pre_approved(tc.name):
+                    has_non_parallelizable = True
+
+        if has_streaming:
+            return False
+
+        if has_subagent and has_non_parallelizable:
+            return False
+
+        if has_subagent:
+            return True
+
+        if has_non_parallelizable:
+            return False
+
         return True
+
+    def _is_session_pre_approved(self, tool_name: str) -> bool:
+        if self._permission_client is None:
+            return False
+        try:
+            session_perms = getattr(
+                self._permission_client, "_session_permissions", None
+            )
+            if session_perms and tool_name in session_perms:
+                return True
+        except Exception:
+            pass
+        return False
 
     async def _iter_tool_events(
         self,
@@ -963,20 +1020,29 @@ class Agent:
         """
         if self._should_parallelize_tool_calls(tool_calls):
 
+            from .tools.subagent import AgentTool as _AT
+
             async def _run_one(
                 idx: int,
                 tc: ToolCall,
             ) -> tuple[int, list[AgentEvent], list[dict[str, Any]]]:
+                t = self._tools.get(tc.name)
+                sem = (
+                    self._subagent_semaphore
+                    if isinstance(t, _AT)
+                    else self._tool_semaphore
+                )
                 frag: list[dict[str, Any]] = []
                 buf: list[AgentEvent] = []
-                async for evt in self._collect_single_tool_events(
-                    session_id,
-                    tc,
-                    frag,
-                    plan_mode=plan_mode,
-                    iteration_budget=iteration_budget,
-                ):
-                    buf.append(evt)
+                async with sem:
+                    async for evt in self._collect_single_tool_events(
+                        session_id,
+                        tc,
+                        frag,
+                        plan_mode=plan_mode,
+                        iteration_budget=iteration_budget,
+                    ):
+                        buf.append(evt)
                 return (idx, buf, frag)
 
             gathered = await asyncio.gather(
@@ -1104,13 +1170,17 @@ class Agent:
 
             if isinstance(tool, AgentTool):
                 final: SubagentRunFinal | None = None
+                _last_sub_yield = time.monotonic()
                 try:
                     async for item in tool.forward_subagent_events(tool_call, context):
                         if isinstance(item, SubagentRunFinal):
                             final = item
                         else:
                             yield item
-                        await asyncio.sleep(0)
+                        now = time.monotonic()
+                        if now - _last_sub_yield >= self._YIELD_INTERVAL:
+                            await asyncio.sleep(0)
+                            _last_sub_yield = now
                 except Exception as e:
                     err = f"Error executing tool: {e}"
                     results_fragment.append(_persisted_tool_result_dict(tool_call, err, True))
@@ -1282,13 +1352,18 @@ class Agent:
                 except Exception:
                     pass
             else:
+                from .tools.subagent import AgentTool as _AgentToolCheck
+                _effective_timeout = TOOL_TIMEOUT
+                if isinstance(tool, _AgentToolCheck):
+                    _params = tool_call.input if isinstance(tool_call.input, dict) else {}
+                    _effective_timeout = min(int(_params.get("timeout", 300)), 600)
                 try:
                     response = await asyncio.wait_for(
                         tool.run(tool_call, context),
-                        timeout=TOOL_TIMEOUT,
+                        timeout=_effective_timeout,
                     )
                 except asyncio.TimeoutError:
-                    _timeout_msg = f"Tool '{tool_name}' timed out after {TOOL_TIMEOUT}s"
+                    _timeout_msg = f"Tool '{tool_name}' timed out after {_effective_timeout}s"
                     results_fragment.append(
                         _persisted_tool_result_dict(tool_call, _timeout_msg, True)
                     )
@@ -1430,7 +1505,6 @@ class Agent:
             new_count = len(history)
         if new_count == 0 and self._provider_messages_cache:
             result = list(self._provider_messages_cache)
-            _normalize_tool_message_sequences_for_api(result)
             return result
 
         if not self._provider_messages_cache:
@@ -1445,6 +1519,7 @@ class Agent:
         except Exception:
             inject_reasoning = False
 
+        cache_len_before = len(self._provider_messages_cache)
         new_msgs = history[self._provider_messages_cache_len:]
         for msg in new_msgs:
             converted = self._convert_single_message(msg, inject_reasoning)
@@ -1453,7 +1528,9 @@ class Agent:
         self._provider_messages_cache_len = len(history)
 
         result = list(self._provider_messages_cache)
-        _normalize_tool_message_sequences_for_api(result)
+        _normalize_tool_message_sequences_for_api(
+            result, start_from=max(0, cache_len_before - 1)
+        )
         return result
 
     def _convert_single_message(

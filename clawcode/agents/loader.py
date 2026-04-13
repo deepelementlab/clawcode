@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,9 @@ from typing import Any
 from ..storage_paths import iter_read_candidates
 
 logger = logging.getLogger(__name__)
+
+_AGENT_DEFS_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_AGENT_DEFS_TTL: float = 30.0
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n(.*)", re.DOTALL)
 
@@ -273,7 +277,16 @@ def builtin_agent_definitions() -> dict[str, AgentDefinition]:
 
 
 def load_merged_agent_definitions(working_directory: str) -> dict[str, AgentDefinition]:
-    """Merge builtins <- user ~/.claude/agents <- project .claw/.clawcode/.claude agents (later wins)."""
+    """Merge builtins <- user ~/.claude/agents <- project .claw/.clawcode/.claude agents (later wins).
+
+    Results are cached with a 30-second TTL to avoid redundant disk I/O.
+    """
+    cache_key = working_directory
+    now = time.monotonic()
+    cached = _AGENT_DEFS_CACHE.get(cache_key)
+    if cached is not None and now - cached[0] < _AGENT_DEFS_TTL:
+        return dict(cached[1])
+
     merged = dict(builtin_agent_definitions())
     home_agents = Path.home() / ".claude" / "agents"
     for name, dfn in _load_directory(home_agents, "user").items():
@@ -282,4 +295,5 @@ def load_merged_agent_definitions(working_directory: str) -> dict[str, AgentDefi
     for proj_agents in reversed(proj_candidates):
         for name, dfn in _load_directory(proj_agents, "project").items():
             merged[name] = dfn
-    return merged
+    _AGENT_DEFS_CACHE[cache_key] = (now, merged)
+    return dict(merged)

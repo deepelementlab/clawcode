@@ -208,6 +208,9 @@ class BaseProvider(ABC):
         self.max_tokens = max_tokens
         self.system_message = system_message
         self._extra_options = kwargs
+        self._retry_max_retries: int = 2
+        self._retry_base_delay: float = 1.0
+        self._retry_max_delay: float = 30.0
 
     @abstractmethod
     async def send_messages(
@@ -255,14 +258,73 @@ class BaseProvider(ABC):
         Returns:
             True if healthy, False otherwise
         """
-        try:
-            await self.send_messages(
-                [{"role": "user", "content": "ping"}],
-                tools=None,
-            )
-            return True
-        except Exception:
-            return False
+        return True
+
+    async def _with_retry(self, coro_factory, *args, **kwargs):
+        """Execute an async callable with retry logic for transient errors.
+
+        Args:
+            coro_factory: An async callable (typically a method).
+            *args: Positional arguments for the callable.
+            **kwargs: Keyword arguments for the callable.
+
+        Returns:
+            The result of the callable.
+
+        Raises:
+            The last exception if all retries are exhausted.
+        """
+        import logging
+        import random
+
+        from .providers.retry import _RETRYABLE_ERRORS
+
+        log = logging.getLogger(__name__)
+        max_retries = getattr(self, "_retry_max_retries", 2)
+        base_delay = getattr(self, "_retry_base_delay", 1.0)
+        max_delay = getattr(self, "_retry_max_delay", 30.0)
+        last_error: Exception | None = None
+        for attempt in range(max_retries + 1):
+            try:
+                return await coro_factory(*args, **kwargs)
+            except _RETRYABLE_ERRORS as e:
+                last_error = e
+                if attempt >= max_retries:
+                    break
+                delay = min(
+                    base_delay * (2 ** attempt)
+                    + random.uniform(0, 0.5),
+                    max_delay,
+                )
+                log.info(
+                    "Provider call failed (%s), retry %d/%d in %.1fs",
+                    type(e).__name__,
+                    attempt + 1,
+                    self._retry_max_retries,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+        raise last_error
+
+    async def close(self) -> None:
+        """Close the provider and release underlying HTTP connections.
+
+        Subclasses should override this if they hold additional resources.
+        """
+        client = getattr(self, "_client", None)
+        if client is not None:
+            if hasattr(client, "aclose"):
+                await client.aclose()
+            elif hasattr(client, "close"):
+                coro = client.close()
+                if coro is not None:
+                    await coro
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.close()
 
     @property
     def supports_tools(self) -> bool:
