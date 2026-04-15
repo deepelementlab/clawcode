@@ -103,6 +103,19 @@ The demo and baseline now adopt the Google Stitch open-source standard. And The 
 
 <img width="1830" height="620" alt="image" src="https://github.com/user-attachments/assets/a77785c8-23e8-4678-a3c7-e541d1f12096" />
 
+## Product Design with DesignTeam (/designteam)
+
+In one line: DesignTeam is ClawCode’s product-design pipeline as a first-class slash command—spin up an Orchestrator plus specialist design agents from a single prompt and ship a structured system design document and specs that teams can hand off to engineering, not a one-off “chatty UI suggestion.”
+
+<img width="1376" height="768" alt="Clipboard - 2026-04-15 16 44 10" src="https://github.com/user-attachments/assets/3bca5ec0-324a-4ce3-b520-7dc86fd2c7be" />
+
+| Dimension | Typical "AI design helpers" | **ClawCode DesignTeam** |
+|-----------|----------------------------|-------------------------|
+| Deliverable | Fragmented tips, single-turn replies | **Structured system design doc** + phased artifacts, cumulative and reviewable |
+| Roles | Implicit single persona | **Explicit multi-agent roster** (Tier‑1: research, IXD, UI, product, visual/ops, experience)—orchestrator picks a **minimal sufficient** set |
+| Context & memory | Prompt-only | **TECAP + role ECAP** retrieval, plus optional `.claw/design/designteam/*.yaml` context |
+| Boundary with engineering | Often blurred with "just build it" | Clear split vs **`/clawteam`**: DesignTeam = **design docs & specs**; ClawTeam = **implementation & engineering delivery** |
+| Multi-turn closure | Rare or ad hoc | **`/designteam --deep_loop`**: **7-phase design workflow** with outer-loop iterations; **`DEEP_LOOP_EVAL_JSON` / `DEEP_LOOP_WRITEBACK_JSON`** for machine-readable convergence and learning-service writeback |
 
 ## Development assistance functions
 
