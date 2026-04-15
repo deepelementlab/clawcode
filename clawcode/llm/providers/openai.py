@@ -160,6 +160,12 @@ class OpenAIProvider(BaseProvider):
 
         self._client = AsyncOpenAI(**client_kwargs)
 
+        # BaseProvider sets these in __init__; OpenAIProvider does not call super().__init__
+        # but inherits _with_retry(), which reads these attributes (see llm/base.py).
+        self._retry_max_retries: int = 2
+        self._retry_base_delay: float = 1.0
+        self._retry_max_delay: float = 30.0
+
     @property
     def openai_compat_adapter(self) -> Any:
         """Selected OpenAI-compatible adapter (or NullAdapter)."""
@@ -826,12 +832,41 @@ class OpenAIProvider(BaseProvider):
         Returns:
             Parsed arguments dict or original string if parsing fails
         """
+        import ast
         import json
 
+        # Primary: strict JSON parsing
         try:
             return json.loads(arguments)
         except json.JSONDecodeError:
-            return arguments
+            pass
+
+        # Fallback 1: ast.literal_eval handles single-quoted Python dicts
+        try:
+            parsed = ast.literal_eval(arguments)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+        # Fallback 2: strip common wrappers like function_call(...)
+        stripped = arguments.strip()
+        if stripped.startswith("(") and stripped.endswith(")"):
+            stripped = stripped[1:-1].strip()
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            pass
+
+        # Fallback 3: try literal_eval on stripped version
+        try:
+            parsed = ast.literal_eval(stripped)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+        return arguments
 
 
 def create_openai_provider(

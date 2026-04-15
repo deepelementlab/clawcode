@@ -351,6 +351,15 @@ class ClosedLoopConfig(BaseModel):
     #: When > 0, ``deeploop_convergence_decision_with_alerts`` may stop early if dashboard
     #: ``closed_loop_gain_consistency`` is at or above this threshold.
     clawteam_deeploop_consistency_min: float = 0.0
+    designteam_deeploop_enabled: bool = True
+    designteam_deeploop_max_iters: int = 100
+    designteam_deeploop_min_gap_delta: float = 0.05
+    designteam_deeploop_convergence_rounds: int = 2
+    designteam_deeploop_handoff_target: float = 0.85
+    designteam_deeploop_critical_degrade_enabled: bool = True
+    designteam_deeploop_auto_writeback_enabled: bool = True
+    designteam_deeploop_max_rollbacks: int = 2
+    designteam_deeploop_consistency_min: float = 0.0
     experience_alert_thresholds: dict[str, dict[str, float | int]] = Field(
         default_factory=lambda: {
             "ecap_effectiveness_avg": {"warning_lt": 0.55, "critical_lt": 0.45},
@@ -454,6 +463,12 @@ class Settings(BaseSettings):
 
     # Shell cwd when the CLI started (UI catalog lookup with ``-c`` target; set programmatically)
     cli_launch_directory: str = Field(default="")
+
+    # UI style mode: "off" | "on" | "hybrid"
+    ui_style_mode: str = Field(default="off")
+
+    # UI style locked slug (empty = auto-select)
+    ui_style_selected: str = Field(default="")
 
     # Providers
     providers: dict[str, Provider] = Field(

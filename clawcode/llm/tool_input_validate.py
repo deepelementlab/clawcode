@@ -16,7 +16,12 @@ def pilot_validate_tool_input(tool_name: str, params: dict[str, Any]) -> str | N
             return "Invalid input for bash: 'command' must be a non-empty string."
         return None
     if tool_name == "write":
-        fp = params.get("file_path")
+        fp = (
+            params.get("file_path")
+            or params.get("filePath")
+            or params.get("path")
+            or params.get("filename")
+        )
         if not isinstance(fp, str) or not fp.strip():
             return "Invalid input for write: 'file_path' must be a non-empty string."
         if "content" not in params:

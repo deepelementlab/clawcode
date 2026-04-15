@@ -679,8 +679,8 @@ class _AssistantMessageWidget(_MessageWidget):
     }
     """
 
-    # 100ms throttle: reduces Markdown re-parse frequency from ~16/s to ~10/s.
-    _REFRESH_INTERVAL = 0.10
+    # 150ms throttle: reduces Markdown re-parse frequency with cached renderable.
+    _REFRESH_INTERVAL = 0.15
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__("assistant", **kwargs)
@@ -692,6 +692,9 @@ class _AssistantMessageWidget(_MessageWidget):
         # Cached joined content string to avoid repeated O(n) join.
         self._cached_content: str = ""
         self._content_dirty: bool = False
+        # Cached renderable: avoids re-parsing Markdown on every pulse/scroll repaint.
+        self._cached_renderable: RenderableType | None = None
+        self._render_needs_rebuild: bool = True  # True when parts changed
 
     def append_content(self, content: str) -> None:
         """Append content (throttled refresh to avoid O(n^2) Markdown re-parse)."""

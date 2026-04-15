@@ -23,6 +23,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import uuid
 from typing import Any
 
@@ -44,7 +45,7 @@ def _json_dump(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-def _coerce_timeout_s(raw: Any, default: float = 30.0) -> float:
+def _coerce_timeout_s(raw: Any, default: float = 60.0) -> float:
     try:
         v = float(raw)
         if v <= 0:
@@ -651,10 +652,38 @@ except Exception:
     env["EXEC_CODE_RPC_PORT"] = str(rpc_port)
     env["EXEC_CODE_RPC_TOKEN"] = rpc_token
 
+    # Write the wrapper script to a temporary file instead of using `python -c`.
+    # On Windows, `python -c <very long string>` can hit command-line length limits
+    # (~8191 chars for cmd.exe) or encoding issues, causing the subprocess to hang
+    # silently until timeout.  Using a temp file avoids both problems.
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".py", prefix="clawcode_exec_")
+    wrapper_tmp_path = tmp_path
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            f.write(wrapper)
+    except Exception:
+        try:
+            os.close(tmp_fd)
+        except Exception:
+            pass
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+        server.close()
+        with contextlib.suppress(Exception):
+            await server.wait_closed()
+        return {
+            "success": False,
+            "kind": "python",
+            "stdout": "",
+            "stderr": "Failed to write sandbox wrapper script to temporary file",
+            "returncode": 1,
+        }
+
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
-        "-c",
-        wrapper,
+        wrapper_tmp_path,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=cwd or None,
@@ -672,6 +701,10 @@ except Exception:
         server.close()
         with contextlib.suppress(Exception):  # type: ignore[name-defined]
             await server.wait_closed()
+        try:
+            os.unlink(wrapper_tmp_path)
+        except Exception:
+            pass
         return {
             "success": False,
             "kind": "python",
@@ -683,6 +716,10 @@ except Exception:
         server.close()
         try:
             await server.wait_closed()
+        except Exception:
+            pass
+        try:
+            os.unlink(wrapper_tmp_path)
         except Exception:
             pass
 
@@ -740,7 +777,7 @@ class ExecuteCodeTool(BaseTool):
                     "timeout_s": {
                         "type": "number",
                         "description": "Timeout in seconds.",
-                        "default": 30,
+                        "default": 60,
                     },
                 },
                 "required": ["kind", "code"],
@@ -754,9 +791,27 @@ class ExecuteCodeTool(BaseTool):
 
     async def run(self, call: ToolCall, context: ToolContext) -> ToolResponse:
         params = call.get_input_dict()
-        kind = str(params.get("kind", "")).strip().lower()
-        code = params.get("code", "")
-        timeout_s = _coerce_timeout_s(params.get("timeout_s", 30), default=30.0)
+
+        # Normalize parameter aliases: some LLMs use "type" instead of "kind",
+        # or "command"/"source" instead of "code".
+        kind = (
+            params.get("kind")
+            or params.get("type")
+            or params.get("mode")
+            or ""
+        )
+        kind = str(kind).strip().lower()
+
+        code = (
+            params.get("code")
+            or params.get("command")
+            or params.get("source")
+            or params.get("script")
+            or params.get("content")
+            or ""
+        )
+
+        timeout_s = _coerce_timeout_s(params.get("timeout_s", 60), default=60.0)
 
         if kind not in {"shell", "python"}:
             payload = {

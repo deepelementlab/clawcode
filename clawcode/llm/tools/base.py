@@ -75,12 +75,18 @@ class ToolCall:
         if isinstance(self.input, dict):
             result = normalize_tool_input_dict(self.input, tool_name=self.name)
         else:
+            parsed: Any = None
             try:
-                parsed: Any = json.loads(self.input)
+                parsed = json.loads(self.input)
             except json.JSONDecodeError:
-                result = {"raw": self.input}
-                self._cached_input_dict = result
-                return result
+                # Fallback: try ast.literal_eval for single-quoted Python dicts
+                try:
+                    import ast
+                    parsed = ast.literal_eval(self.input)
+                except Exception:
+                    result = {"raw": self.input}
+                    self._cached_input_dict = result
+                    return result
             if isinstance(parsed, dict):
                 result = normalize_tool_input_dict(parsed, tool_name=self.name)
             else:

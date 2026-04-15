@@ -16,7 +16,7 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
 
 from .base import BaseProvider, ProviderEvent, ProviderEventType, ToolCall, TokenUsage
 from .claw_support.iteration_budget import IterationBudget
@@ -281,6 +281,61 @@ def _normalize_tool_message_sequences_for_api(
     messages[:] = prefix + out
 
 
+def _heal_orphan_tool_rows_before_send(
+    messages: list[dict[str, Any]],
+) -> tuple[int, int]:
+    """Drop orphan ``tool`` rows and ensure each assistant tool_call has a result row.
+
+    Returns:
+        (dropped_orphans, synthesized_missing_rows)
+    """
+    out: list[dict[str, Any]] = []
+    dropped = 0
+    synthesized = 0
+    i = 0
+    while i < len(messages):
+        m = messages[i]
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            out.append(m)
+            required: list[str] = []
+            for tc in m.get("tool_calls", []):
+                if isinstance(tc, dict) and tc.get("id"):
+                    required.append(str(tc["id"]))
+            i += 1
+            bodies: dict[str, list[str]] = defaultdict(list)
+            while i < len(messages) and messages[i].get("role") == "tool":
+                row = messages[i]
+                tid = str(row.get("tool_call_id") or "")
+                if tid in required:
+                    bodies[tid].append(str(row.get("content") if row.get("content") is not None else ""))
+                else:
+                    dropped += 1
+                i += 1
+            for rid in required:
+                queue = bodies.get(rid)
+                if queue:
+                    content = queue.pop(0)
+                else:
+                    content = "Error: missing tool output for this call."
+                    synthesized += 1
+                out.append({
+                    "role": "tool",
+                    "tool_call_id": rid,
+                    "content": content,
+                })
+            continue
+
+        if m.get("role") == "tool":
+            dropped += 1
+            i += 1
+            continue
+
+        out.append(m)
+        i += 1
+    messages[:] = out
+    return dropped, synthesized
+
+
 def _persisted_tool_result_dict(
     tool_call: ToolCall, content: str, is_error: bool
 ) -> dict[str, Any]:
@@ -413,6 +468,9 @@ class Agent:
         self._cached_tool_schemas: list[dict[str, Any]] | None = None
         self._provider_messages_cache: list[dict[str, Any]] = []
         self._provider_messages_cache_len: int = 0
+        self._bg_provider_messages_cache: list[dict[str, Any]] = []
+        self._bg_provider_messages_cache_len: int = 0
+        self._bg_provider_messages_cache_session_id: str | None = None
         self._last_flush_time: float = 0.0
         self._flush_cooldown: float = 60.0
         self._YIELD_INTERVAL: float = 0.05
@@ -431,6 +489,12 @@ class Agent:
         self._metric_memory_flush_duplicate_skips = 0
         self._metric_memory_reset_hits = 0
         self._metric_skill_reset_hits = 0
+        self._metric_provider_bg_cache_hits = 0
+        self._metric_provider_bg_cache_misses = 0
+        self._metric_provider_bg_cache_resets = 0
+        self._metric_provider_normalize_full_fallbacks = 0
+        self._metric_provider_orphan_tool_healed_count = 0
+        self._metric_provider_orphan_tool_dropped_count = 0
 
     @property
     def provider(self) -> BaseProvider:
@@ -534,7 +598,13 @@ class Agent:
         flush_msg = await self._create_user_message(session_id=session_id, content=flush_prompt, attachments=None)
         temp_history.append(flush_msg)
         tool_schemas = [memory_tool.info().to_dict()]
-        provider_messages = self._convert_history_to_provider(temp_history, tools_present=True)
+        provider_messages = self._convert_history_to_provider(
+            temp_history,
+            tools_present=True,
+            use_incremental_cache=True,
+            cache_scope="background",
+            cache_session_id=session_id,
+        )
         tool_calls: list[ToolCall] = []
         try:
             async for ev in self._provider.stream_response(provider_messages, tool_schemas):
@@ -719,7 +789,20 @@ class Agent:
                     provider_messages = self._convert_history_to_provider(
                         history,
                         tools_present=bool(tool_schemas),
+                        cache_scope="main",
+                        cache_session_id=session_id,
                     )
+                    if tool_schemas:
+                        dropped, synthesized = _heal_orphan_tool_rows_before_send(provider_messages)
+                        if dropped or synthesized:
+                            self._metric_provider_orphan_tool_dropped_count += dropped
+                            self._metric_provider_orphan_tool_healed_count += synthesized
+                            _logger.warning(
+                                "Healed provider messages before send: dropped_orphan_tool=%s synthesized_missing_tool=%s session=%s",
+                                dropped,
+                                synthesized,
+                                session_id,
+                            )
                     tool_calls: list[ToolCall] = []
                     stream_failed: str | None = None
                     _last_yield_time = time.monotonic()
@@ -886,9 +969,14 @@ class Agent:
                 or self._metric_memory_flush_duplicate_skips
                 or self._metric_memory_reset_hits
                 or self._metric_skill_reset_hits
+                or self._metric_provider_bg_cache_hits
+                or self._metric_provider_bg_cache_misses
+                or self._metric_provider_bg_cache_resets
+                or self._metric_provider_orphan_tool_healed_count
+                or self._metric_provider_orphan_tool_dropped_count
             ):
                 _logger.info(
-                    "closed-loop-metrics session=%s memory_nudge=%s skill_nudge=%s flush=%s/%s flush_budget_hit=%s flush_dup_skip=%s reset(memory=%s,skill=%s)",
+                    "closed-loop-metrics session=%s memory_nudge=%s skill_nudge=%s flush=%s/%s flush_budget_hit=%s flush_dup_skip=%s reset(memory=%s,skill=%s) bg_cache(hit=%s,miss=%s,reset=%s) orphan(heal=%s,drop=%s)",
                     session_id,
                     self._metric_memory_nudge_triggered,
                     self._metric_skill_nudge_triggered,
@@ -898,6 +986,11 @@ class Agent:
                     self._metric_memory_flush_duplicate_skips,
                     self._metric_memory_reset_hits,
                     self._metric_skill_reset_hits,
+                    self._metric_provider_bg_cache_hits,
+                    self._metric_provider_bg_cache_misses,
+                    self._metric_provider_bg_cache_resets,
+                    self._metric_provider_orphan_tool_healed_count,
+                    self._metric_provider_orphan_tool_dropped_count,
                 )
                 emit_ops_event(
                     "agent_closed_loop_metrics",
@@ -912,6 +1005,11 @@ class Agent:
                         "flush_attempts": self._metric_memory_flush_attempts,
                         "flush_budget_hit": self._metric_memory_flush_budget_hits,
                         "flush_dup_skip": self._metric_memory_flush_duplicate_skips,
+                        "provider_bg_cache_hits": self._metric_provider_bg_cache_hits,
+                        "provider_bg_cache_misses": self._metric_provider_bg_cache_misses,
+                        "provider_bg_cache_resets": self._metric_provider_bg_cache_resets,
+                        "provider_orphan_tool_healed_count": self._metric_provider_orphan_tool_healed_count,
+                        "provider_orphan_tool_dropped_count": self._metric_provider_orphan_tool_dropped_count,
                     },
                 )
             self._ephemeral_user_suffix = ""
@@ -1482,7 +1580,13 @@ class Agent:
         )
 
     def _convert_history_to_provider(
-        self, history: list[Message], *, tools_present: bool = False
+        self,
+        history: list[Message],
+        *,
+        tools_present: bool = False,
+        use_incremental_cache: bool = True,
+        cache_scope: Literal["main", "background"] = "main",
+        cache_session_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Convert message history to provider format with multimodal support.
 
@@ -1495,21 +1599,62 @@ class Agent:
         Returns:
             Provider format messages
         """
-        new_count = len(history) - getattr(self, '_provider_messages_cache_len', 0)
-        if not hasattr(self, '_provider_messages_cache'):
+        if not hasattr(self, "_provider_messages_cache"):
             self._provider_messages_cache = []
             self._provider_messages_cache_len = 0
-        if new_count < 0:
-            self._provider_messages_cache.clear()
-            self._provider_messages_cache_len = 0
-            new_count = len(history)
-        if new_count == 0 and self._provider_messages_cache:
-            result = list(self._provider_messages_cache)
-            return result
+        if not hasattr(self, "_bg_provider_messages_cache"):
+            self._bg_provider_messages_cache = []
+            self._bg_provider_messages_cache_len = 0
+            self._bg_provider_messages_cache_session_id = None
+        if not hasattr(self, "_metric_provider_bg_cache_hits"):
+            self._metric_provider_bg_cache_hits = 0
+            self._metric_provider_bg_cache_misses = 0
+            self._metric_provider_bg_cache_resets = 0
+            self._metric_provider_normalize_full_fallbacks = 0
+            self._metric_provider_orphan_tool_healed_count = 0
+            self._metric_provider_orphan_tool_dropped_count = 0
 
-        if not self._provider_messages_cache:
+        # Optional uncached mode for one-shot conversions.
+        if not use_incremental_cache:
+            cache = []
+            cache_len = 0
+        elif cache_scope == "background":
+            if (
+                cache_session_id
+                and self._bg_provider_messages_cache_session_id != cache_session_id
+            ):
+                self._bg_provider_messages_cache = []
+                self._bg_provider_messages_cache_len = 0
+                self._bg_provider_messages_cache_session_id = cache_session_id
+                self._metric_provider_bg_cache_resets += 1
+            cache = self._bg_provider_messages_cache
+            cache_len = int(self._bg_provider_messages_cache_len)
+        else:
+            cache = self._provider_messages_cache
+            cache_len = int(self._provider_messages_cache_len)
+
+        new_count = len(history) - cache_len
+        if new_count < 0:
+            cache.clear()
+            cache_len = 0
+            if use_incremental_cache:
+                if cache_scope == "background":
+                    self._bg_provider_messages_cache_len = 0
+                    self._metric_provider_bg_cache_resets += 1
+                else:
+                    self._provider_messages_cache_len = 0
+            new_count = len(history)
+        if new_count == 0 and cache:
+            if use_incremental_cache and cache_scope == "background":
+                self._metric_provider_bg_cache_hits += 1
+            result = list(cache)
+            return result
+        if use_incremental_cache and cache_scope == "background":
+            self._metric_provider_bg_cache_misses += 1
+
+        if not cache:
             system_msg = {"role": "system", "content": self._system_prompt}
-            self._provider_messages_cache.append(system_msg)
+            cache.append(system_msg)
 
         inject_reasoning = False
         try:
@@ -1519,22 +1664,36 @@ class Agent:
         except Exception:
             inject_reasoning = False
 
-        cache_len_before = len(self._provider_messages_cache)
-        new_msgs = history[self._provider_messages_cache_len:]
+        new_msgs = history[cache_len:]
         for msg in new_msgs:
-            converted = self._convert_single_message(msg, inject_reasoning)
+            converted = self._convert_single_message(msg, inject_reasoning, cache=cache)
             if converted is not None:
-                self._provider_messages_cache.extend(converted)
-        self._provider_messages_cache_len = len(history)
+                cache.extend(converted)
+        if use_incremental_cache:
+            if cache_scope == "background":
+                self._bg_provider_messages_cache_len = len(history)
+                if cache_session_id:
+                    self._bg_provider_messages_cache_session_id = cache_session_id
+            else:
+                self._provider_messages_cache_len = len(history)
 
-        result = list(self._provider_messages_cache)
-        _normalize_tool_message_sequences_for_api(
-            result, start_from=max(0, cache_len_before - 1)
-        )
+        result = list(cache)
+        # Always normalize the full list. Incremental `start_from` was unsafe:
+        # `cache_len_before` counts *provider rows* (one TOOL Message can become many
+        # rows), so `start_from = cache_len_before - 1` could split *between* tool
+        # rows that belong to the same assistant — then `tail` starts with `tool`
+        # and the loop treats them as orphans → OpenAI 400:
+        # "Messages with role 'tool' must be a response to ... 'tool_calls'".
+        self._metric_provider_normalize_full_fallbacks += 1
+        _normalize_tool_message_sequences_for_api(result, start_from=0)
         return result
 
     def _convert_single_message(
-        self, msg: Message, inject_reasoning: bool
+        self,
+        msg: Message,
+        inject_reasoning: bool,
+        *,
+        cache: list[dict[str, Any]],
     ) -> list[dict[str, Any]] | None:
         if msg.role == MessageRole.TOOL:
             raw = (msg.content or "").strip()
@@ -1582,17 +1741,17 @@ class Agent:
                         "content": body,
                     })
                 # Attach tool_calls to preceding assistant if needed.
-                i = len(self._provider_messages_cache) - 1
-                while i >= 0 and self._provider_messages_cache[i].get("role") == "tool":
+                i = len(cache) - 1
+                while i >= 0 and cache[i].get("role") == "tool":
                     i -= 1
                 can_emit_tools = False
-                if i >= 0 and self._provider_messages_cache[i].get("role") == "assistant":
-                    if not self._provider_messages_cache[i].get("tool_calls") and oai_tool_calls:
-                        self._provider_messages_cache[i]["tool_calls"] = oai_tool_calls
-                        if self._provider_messages_cache[i].get("content") is None:
-                            self._provider_messages_cache[i]["content"] = ""
+                if i >= 0 and cache[i].get("role") == "assistant":
+                    if not cache[i].get("tool_calls") and oai_tool_calls:
+                        cache[i]["tool_calls"] = oai_tool_calls
+                        if cache[i].get("content") is None:
+                            cache[i]["content"] = ""
                         can_emit_tools = True
-                    elif self._provider_messages_cache[i].get("tool_calls"):
+                    elif cache[i].get("tool_calls"):
                         can_emit_tools = True
                 if can_emit_tools and tool_rows:
                     return tool_rows

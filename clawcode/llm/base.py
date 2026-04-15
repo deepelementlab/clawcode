@@ -300,7 +300,7 @@ class BaseProvider(ABC):
                     "Provider call failed (%s), retry %d/%d in %.1fs",
                     type(e).__name__,
                     attempt + 1,
-                    self._retry_max_retries,
+                    getattr(self, "_retry_max_retries", 2),
                     delay,
                 )
                 await asyncio.sleep(delay)

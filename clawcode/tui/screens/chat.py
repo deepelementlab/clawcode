@@ -34,11 +34,28 @@ from ...llm.plan_tasks import compose_task_execution_prompt, split_plan_to_tasks
 from ...llm.ecc_planner_prompt import ECC_PLANNER_MD
 from ..builtin_slash import BUILTIN_SLASH_NAMES, BuiltinSlashContext, parse_slash_line
 from ..builtin_slash_handlers import handle_builtin_slash
+from ..ui_style import (
+    is_ui_intent,
+    load_ui_anti_pattern_rules,
+    load_ui_catalog,
+    select_ui_style_auto,
+    select_ui_style_hybrid,
+    style_delegation_menu,
+    style_prompt_prefix,
+    ui_critic_checklist,
+    derive_scene_tags,
+)
 from ..clawteam_deeploop_pending import (
     clawteam_deeploop_clear_pending,
     clawteam_deeploop_get_pending,
     clawteam_deeploop_set_pending,
 )
+from ..designteam_deeploop_pending import (
+    designteam_deeploop_clear_pending,
+    designteam_deeploop_get_pending,
+    designteam_deeploop_set_pending,
+)
+from ..designteam_design_phases import designteam_runtime_phase_instruction
 from ..code_awareness.monitor import ArchitectureAwarenessMonitor
 from ..code_awareness.widget import CodeAwarenessPanel
 from ..components.chat.claude_input import ClaudeCodeInput
@@ -163,6 +180,20 @@ def _parse_clawteam_namespace_slash(raw_text: str) -> tuple[str, str] | None:
     if not raw.startswith("/clawteam:"):
         return None
     rest = raw[len("/clawteam:") :].strip()
+    if not rest:
+        return None
+    head, sep, tail = rest.partition(" ")
+    if not _PLUGIN_NAMESPACE_CMD.match(head):
+        return None
+    return head, tail.strip() if sep else ""
+
+
+def _parse_designteam_namespace_slash(raw_text: str) -> tuple[str, str] | None:
+    """Parse `/designteam:<agent> [tail]` and return (agent, tail)."""
+    raw = (raw_text or "").strip()
+    if not raw.startswith("/designteam:"):
+        return None
+    rest = raw[len("/designteam:") :].strip()
     if not rest:
         return None
     head, sep, tail = rest.partition(" ")
@@ -408,6 +439,8 @@ class ChatScreen(Screen):
         self._hud_running_tools: dict[str, HudRunningTool] = {}
         self._clawteam_deep_loop_state: dict[str, dict[str, Any]] = {}
         self._clawteam_deep_loop_last_response: dict[str, str] = {}
+        self._designteam_deep_loop_state: dict[str, dict[str, Any]] = {}
+        self._designteam_deep_loop_last_response: dict[str, str] = {}
         self._hud_plugin_manager: Any = None
         self._hud_project_dir: str = ""
         self._hud_counts_last_refresh: float = 0.0
@@ -422,6 +455,13 @@ class ChatScreen(Screen):
         self._hud_dirty: bool = False
         # Track which chrome mode was last fully applied to avoid redundant re-paints.
         self._last_chrome_mode: str = ""
+
+        # UI style auto-selection state (per-session, set by _finalize_send_after_input).
+        self._ui_style_selected: str = ""
+        self._ui_style_source: str = ""
+        self._ui_style_reason: str = ""
+        self._ui_style_top_candidates: list[str] = []
+        self._ui_style_confidence: float = 0.0
 
     def _clamp_right_panel_width(self, w: int) -> int:
         w = int(w)
@@ -1462,18 +1502,23 @@ class ChatScreen(Screen):
 
             # Build deep_loop HUD status string when a loop is active.
             deep_loop_status = ""
+            _dl_dt = self._designteam_deep_loop_state.get(self.current_session_id or "")
             _dl = self._clawteam_loop_store().get(self.current_session_id or "")
-            if isinstance(_dl, dict):
-                dl_iter  = int(_dl.get("iter_idx", 1) or 1)
-                dl_max   = int(_dl.get("max_iters", 100) or 100)
-                dl_stall = int(_dl.get("stall_count", 0) or 0)
-                dl_last  = float(_dl.get("last_activity_at") or 0.0)
+            _dl_use = _dl_dt if isinstance(_dl_dt, dict) else _dl
+            _dl_label = "designteam" if isinstance(_dl_dt, dict) else "clawteam"
+            if isinstance(_dl_use, dict):
+                dl_iter  = int(_dl_use.get("iter_idx", 1) or 1)
+                dl_max   = int(_dl_use.get("max_iters", 100) or 100)
+                dl_stall = int(_dl_use.get("stall_count", 0) or 0)
+                dl_last  = float(_dl_use.get("last_activity_at") or 0.0)
                 idle_s   = max(0.0, time.monotonic() - dl_last) if dl_last else 0.0
                 is_running = run_state is not None and run_state.is_processing
                 icon = "◐" if is_running else "○"
                 stall_suffix = f" | 自动恢复×{dl_stall}" if dl_stall > 0 else ""
                 idle_suffix  = "" if is_running else f" | 等待 {int(idle_s)}s"
-                deep_loop_status = f"{icon} 深度循环 迭代 {dl_iter}/{dl_max}{stall_suffix}{idle_suffix}"
+                deep_loop_status = (
+                    f"{icon} 深度循环({_dl_label}) 迭代 {dl_iter}/{dl_max}{stall_suffix}{idle_suffix}"
+                )
 
             state = HudState(
                 model=model,
@@ -1627,7 +1672,7 @@ class ChatScreen(Screen):
         """Stop the deep_loop watchdog timer only when no loops remain active."""
         if self._deep_loop_monitor_timer is None:
             return
-        if self._clawteam_deep_loop_state:
+        if self._clawteam_deep_loop_state or self._designteam_deep_loop_state:
             return  # other sessions still have active loops
         try:
             self._deep_loop_monitor_timer.stop()
@@ -1677,6 +1722,35 @@ class ChatScreen(Screen):
                 f"自动恢复第 {stall_count + 1}/{self._DEEP_LOOP_MAX_STALLS} 次。",
             )
             self._continue_clawteam_deep_loop_if_needed(sid)
+        for sid, state in list(self._designteam_deep_loop_state.items()):
+            if not isinstance(state, dict):
+                continue
+            run_state = self._get_run_state(sid, create=False)
+            if run_state is not None and run_state.is_processing:
+                state["last_activity_at"] = now
+                continue
+            last_activity = float(state.get("last_activity_at") or 0.0)
+            idle_s = (now - last_activity) if last_activity else 0.0
+            if idle_s < self._DEEP_LOOP_STALL_TIMEOUT_S:
+                continue
+            stall_count = int(state.get("stall_count", 0) or 0)
+            if stall_count >= self._DEEP_LOOP_MAX_STALLS:
+                self._append_designteam_deep_loop_log(
+                    sid,
+                    f"[designteam deep_loop] 自动恢复已达上限（{stall_count} 次），放弃循环。",
+                )
+                self._designteam_deep_loop_state.pop(sid, None)
+                self._designteam_deep_loop_last_response.pop(sid, None)
+                self._stop_deep_loop_monitor()
+                continue
+            state["stall_count"] = stall_count + 1
+            state["last_activity_at"] = now
+            self._append_designteam_deep_loop_log(
+                sid,
+                f"[designteam deep_loop] 检测到循环中断（闲置 {int(idle_s)}s），"
+                f"自动恢复第 {stall_count + 1}/{self._DEEP_LOOP_MAX_STALLS} 次。",
+            )
+            self._continue_designteam_deep_loop_if_needed(sid)
         self._update_status_bars()  # refresh HUD idle counter
 
     async def switch_session(self, session_id: str) -> None:
@@ -2625,6 +2699,61 @@ class ChatScreen(Screen):
         )
         run_state.task = task
 
+    def _apply_ui_style_prefix(self, raw_content: str, content_for_agent: str) -> str:
+        ui_style_mode = getattr(self.settings, "ui_style_mode", "off") or "off"
+        if ui_style_mode not in ("on", "hybrid"):
+            return content_for_agent
+        try:
+            ui_locked = getattr(self.settings, "ui_style_selected", "") or ""
+            wd_val = (self.settings.working_directory or ".").strip() or "."
+            cli_dir = getattr(self.settings, "cli_launch_directory", None) or None
+            catalog = load_ui_catalog(wd_val, cli_launch_directory=cli_dir)
+            if not catalog:
+                return content_for_agent
+            entry = None
+            if ui_locked:
+                entry = next((s for s in catalog if s.slug == ui_locked), None)
+            pick = None
+            if entry is None:
+                scene = derive_scene_tags(raw_content)
+                if ui_style_mode == "hybrid":
+                    pick = select_ui_style_hybrid(
+                        raw_content,
+                        catalog,
+                        scene_tags=scene,
+                        preferred_slug="",
+                    )
+                else:
+                    pick = select_ui_style_auto(
+                        raw_content,
+                        catalog,
+                        scene_tags=scene,
+                        preferred_slug="",
+                    )
+                if pick is not None:
+                    entry = next((s for s in catalog if s.slug == pick.slug), None)
+                    self._ui_style_selected = pick.slug
+                    self._ui_style_source = "hybrid" if ui_style_mode == "hybrid" else "auto"
+                    self._ui_style_reason = pick.reason
+                    self._ui_style_top_candidates = pick.top_candidates
+                    self._ui_style_confidence = pick.confidence
+            else:
+                self._ui_style_selected = ui_locked
+                self._ui_style_source = "user"
+            if entry is not None:
+                anti_rules = load_ui_anti_pattern_rules(wd_val, slug=entry.slug, cli_launch_directory=cli_dir)
+                anti_pats = [r.pattern for r in anti_rules]
+                prefix = style_prompt_prefix(entry)
+                critic = ui_critic_checklist(entry, anti_patterns=anti_pats, anti_rules=anti_rules)
+                result = prefix + critic
+                if pick is not None and pick.top_candidates:
+                    menu = style_delegation_menu(pick.slug, pick.top_candidates, catalog)
+                    result += menu
+                return result + content_for_agent
+        except Exception:
+            pass
+        return content_for_agent
+
     def _finalize_send_after_input(
         self,
         *,
@@ -2804,6 +2933,11 @@ class ChatScreen(Screen):
             plan_background_tasks=plan_background_tasks,
             plan_blocks_claw=plan_blocks_claw,
             claw_mode_enabled=bool(getattr(self, "_claw_mode_enabled", False)),
+            ui_style_mode=getattr(self.settings, "ui_style_mode", "off") or "off",
+            ui_style_selected=getattr(self, "_ui_style_selected", ""),
+            ui_style_reason=getattr(self, "_ui_style_reason", ""),
+            ui_style_top_candidates=getattr(self, "_ui_style_top_candidates", []),
+            ui_style_source=getattr(self, "_ui_style_source", ""),
         )
 
     def _clawteam_loop_store(self) -> dict[str, dict[str, Any]]:
@@ -2811,6 +2945,25 @@ class ChatScreen(Screen):
 
     def _clawteam_last_response_store(self) -> dict[str, str]:
         return self._clawteam_deep_loop_last_response
+
+    def _designteam_loop_store(self) -> dict[str, dict[str, Any]]:
+        return self._designteam_deep_loop_state
+
+    def _designteam_last_response_store(self) -> dict[str, str]:
+        return self._designteam_deep_loop_last_response
+
+    def _append_designteam_deep_loop_log(self, session_id: str, text: str) -> None:
+        sid = (session_id or "").strip()
+        if not sid:
+            return
+        try:
+            message_list = self._ensure_message_list(sid)
+            message_list.display = True
+            message_list.start_assistant_message()
+            message_list.update_content(text)
+            message_list.finalize_message()
+        except Exception:
+            return
 
     def _append_clawteam_deep_loop_log(self, session_id: str, text: str) -> None:
         sid = (session_id or "").strip()
@@ -2838,6 +2991,41 @@ class ChatScreen(Screen):
             return False, int(getattr(self.settings.closed_loop, "clawteam_deeploop_max_iters", 100) or 100)
         deep_loop = False
         max_iters = int(getattr(self.settings.closed_loop, "clawteam_deeploop_max_iters", 100) or 100)
+        try:
+            tokens = shlex.split((tail or "").strip())
+        except Exception:
+            tokens = (tail or "").split()
+        i = 0
+        while i < len(tokens):
+            tok = tokens[i]
+            if tok == "--deep_loop":
+                deep_loop = True
+                i += 1
+                continue
+            if tok == "--max_iters" and i + 1 < len(tokens):
+                try:
+                    parsed = int(tokens[i + 1])
+                    if parsed >= 1:
+                        max_iters = parsed
+                except Exception:
+                    pass
+                i += 2
+                continue
+            i += 1
+        return deep_loop, max_iters
+
+    def _parse_designteam_deep_loop_runtime_args(self, raw_content: str) -> tuple[bool, int]:
+        """Best-effort parse for `/designteam ... --deep_loop [--max_iters n]`."""
+        head, tail = parse_slash_line(raw_content)
+        ns = _parse_designteam_namespace_slash(raw_content)
+        if ns is not None:
+            d_agent, d_tail = ns
+            head = "designteam"
+            tail = f"--agent {d_agent}" + (f" {d_tail}" if d_tail else "")
+        if head != "designteam":
+            return False, int(getattr(self.settings.closed_loop, "designteam_deeploop_max_iters", 100) or 100)
+        deep_loop = False
+        max_iters = int(getattr(self.settings.closed_loop, "designteam_deeploop_max_iters", 100) or 100)
         try:
             tokens = shlex.split((tail or "").strip())
         except Exception:
@@ -2971,6 +3159,115 @@ class ChatScreen(Screen):
             is_claw_run=False,
         )
 
+    def _continue_designteam_deep_loop_if_needed(self, session_id: str) -> None:
+        sid = (session_id or "").strip()
+        if not sid:
+            return
+        state = self._designteam_loop_store().get(sid)
+        if not isinstance(state, dict):
+            return
+        run_state = self._get_run_state(sid, create=False)
+        if run_state is not None and run_state.is_processing:
+            return
+        iter_idx = int(state.get("iter_idx", 1) or 1)
+        max_iters = int(state.get("max_iters", 100) or 100)
+        min_iters = int(state.get("min_iters", 2) or 2)
+        last_text = self._designteam_last_response_store().get(sid, "")
+        converged, delta_score, has_eval_marker = _extract_deep_loop_eval(last_text)
+
+        no_eval_count = int(state.get("no_eval_count", 0) or 0)
+        if has_eval_marker:
+            no_eval_count = 0
+        else:
+            no_eval_count += 1
+        state["no_eval_count"] = no_eval_count
+
+        delta_text = f"{delta_score:.4f}" if isinstance(delta_score, float) else "unknown"
+        self._append_designteam_deep_loop_log(
+            sid,
+            f"[designteam deep_loop] 迭代 {iter_idx}/{max_iters} 收敛判定："
+            f" converged={str(converged).lower()} · delta_score={delta_text}"
+            + (f" · no_eval={no_eval_count}" if not has_eval_marker else ""),
+        )
+
+        self._start_deep_loop_monitor()
+
+        if iter_idx >= max_iters:
+            self._append_designteam_deep_loop_log(
+                sid,
+                f"[designteam deep_loop] 结束：达到最大轮次 {max_iters}/{max_iters}。",
+            )
+            self._designteam_loop_store().pop(sid, None)
+            self._designteam_last_response_store().pop(sid, None)
+            self._stop_deep_loop_monitor()
+            return
+        if converged and iter_idx >= min_iters:
+            self._append_designteam_deep_loop_log(
+                sid,
+                f"[designteam deep_loop] 结束：第 {iter_idx} 轮满足收敛条件（最少轮次={min_iters}）。",
+            )
+            self._designteam_loop_store().pop(sid, None)
+            self._designteam_last_response_store().pop(sid, None)
+            self._stop_deep_loop_monitor()
+            return
+        if no_eval_count >= self._DEEP_LOOP_MAX_NO_EVAL:
+            self._append_designteam_deep_loop_log(
+                sid,
+                f"[designteam deep_loop] 结束：连续 {no_eval_count} 轮未输出 DEEP_LOOP_EVAL_JSON，"
+                "视为软收敛退出。请检查模型是否支持输出所需的 eval 格式。",
+            )
+            self._designteam_loop_store().pop(sid, None)
+            self._designteam_last_response_store().pop(sid, None)
+            self._stop_deep_loop_monitor()
+            return
+
+        next_iter = iter_idx + 1
+        state["iter_idx"] = next_iter
+        state["last_activity_at"] = time.monotonic()
+
+        prev_output = last_text
+        if len(prev_output) > self._DEEP_LOOP_LAST_TEXT_CAP:
+            omitted = len(prev_output) - self._DEEP_LOOP_LAST_TEXT_CAP
+            prev_output = (
+                f"[...前 {omitted} 字已省略，保留最新内容...]\n"
+                + prev_output[-self._DEEP_LOOP_LAST_TEXT_CAP :]
+            )
+
+        base_prompt = str(state.get("base_prompt", "") or "")
+        phase_hint = designteam_runtime_phase_instruction(next_iter)
+        runtime_prompt = (
+            f"{base_prompt}\n\n"
+            "RUNTIME ENFORCEMENT (system hard-constraint):\n"
+            f"- Current iteration: {next_iter}/{max_iters}\n"
+            f"- Do NOT stop before iteration {min_iters}\n"
+            f"- {phase_hint}\n"
+            "- Keep using designteam protocol (7-phase workflow) and produce DEEP_LOOP_EVAL_JSON at end.\n\n"
+            "Previous iteration output (for continuation):\n"
+            f"{prev_output}\n"
+        )
+        self._start_agent_run(
+            session_id=sid,
+            display_content=f"[深度循环·designteam] 迭代 {next_iter}/{max_iters}",
+            content_for_agent=runtime_prompt,
+            attachments=None,
+            is_plan_run=False,
+            plan_user_request="",
+            plan_artifact_scope="",
+            plan_routing_meta=None,
+            response_artifact_subdir="",
+            build_task_index=-1,
+            is_claw_run=False,
+        )
+
+    def _continue_any_deep_loop_if_needed(self, session_id: str) -> None:
+        sid = (session_id or "").strip()
+        if not sid:
+            return
+        if sid in self._designteam_deep_loop_state:
+            self._continue_designteam_deep_loop_if_needed(sid)
+        elif sid in self._clawteam_deep_loop_state:
+            self._continue_clawteam_deep_loop_if_needed(sid)
+
     async def _run_builtin_slash_send(
         self,
         raw_content: str,
@@ -2992,6 +3289,11 @@ class ChatScreen(Screen):
             c_agent, c_tail = clawteam_ns
             head = "clawteam"
             tail = f"--agent {c_agent}" + (f" {c_tail}" if c_tail else "")
+        designteam_ns = _parse_designteam_namespace_slash(raw_content)
+        if designteam_ns is not None:
+            d_agent, d_tail = designteam_ns
+            head = "designteam"
+            tail = f"--agent {d_agent}" + (f" {d_tail}" if d_tail else "")
         if not head or head not in BUILTIN_SLASH_NAMES:
             return
 
@@ -3221,12 +3523,17 @@ class ChatScreen(Screen):
 
             if outcome.kind == "agent_prompt" and outcome.agent_user_text:
                 deeploop_meta = getattr(outcome, "clawteam_deeploop_meta", None)
+                designteam_dl_meta = getattr(outcome, "designteam_deeploop_meta", None)
                 sid_slash = (self.current_session_id or "").strip()
                 if sid_slash and isinstance(deeploop_meta, dict) and deeploop_meta:
                     clawteam_deeploop_set_pending(sid_slash, deeploop_meta)
+                if sid_slash and isinstance(designteam_dl_meta, dict) and designteam_dl_meta:
+                    designteam_deeploop_set_pending(sid_slash, designteam_dl_meta)
                 if head == "clawteam" and sid_slash:
                     deep_loop_enabled, deep_loop_max_iters = self._parse_clawteam_deep_loop_runtime_args(raw_content)
                     if deep_loop_enabled:
+                        self._designteam_loop_store().pop(sid_slash, None)
+                        self._designteam_last_response_store().pop(sid_slash, None)
                         self._clawteam_loop_store()[sid_slash] = {
                             "iter_idx": 1,
                             "max_iters": deep_loop_max_iters,
@@ -3242,6 +3549,29 @@ class ChatScreen(Screen):
                     else:
                         self._clawteam_loop_store().pop(sid_slash, None)
                         self._clawteam_last_response_store().pop(sid_slash, None)
+                if head == "designteam" and sid_slash:
+                    deep_loop_enabled, deep_loop_max_iters = self._parse_designteam_deep_loop_runtime_args(
+                        raw_content
+                    )
+                    if deep_loop_enabled:
+                        self._clawteam_loop_store().pop(sid_slash, None)
+                        self._clawteam_last_response_store().pop(sid_slash, None)
+                        self._designteam_loop_store()[sid_slash] = {
+                            "iter_idx": 1,
+                            "max_iters": deep_loop_max_iters,
+                            "min_iters": 2,
+                            "base_prompt": outcome.agent_user_text,
+                            "requirement": tail,
+                            "no_eval_count": 0,
+                            "last_activity_at": time.monotonic(),
+                            "stall_count": 0,
+                            "phase_cap": 7,
+                        }
+                        self._designteam_last_response_store().pop(sid_slash, None)
+                        self._start_deep_loop_monitor()
+                    else:
+                        self._designteam_loop_store().pop(sid_slash, None)
+                        self._designteam_last_response_store().pop(sid_slash, None)
                 is_multi_plan = head == "multi-plan"
                 is_multi_execute = head == "multi-execute"
                 is_multi_backend = head == "multi-backend"
@@ -3502,6 +3832,11 @@ class ChatScreen(Screen):
                 c_agent, c_tail = clawteam_ns
                 head = "clawteam"
                 tail = f"--agent {c_agent}" + (f" {c_tail}" if c_tail else "")
+            designteam_ns = _parse_designteam_namespace_slash(raw_content)
+            if designteam_ns is not None:
+                d_agent, d_tail = designteam_ns
+                head = "designteam"
+                tail = f"--agent {d_agent}" + (f" {d_tail}" if d_tail else "")
             if head == "arc-plan":
                 # Single-shot alternative to `/plan`: generate a plan immediately from `/arc-plan <request>`.
                 plan_state = self._get_plan_state(self.current_session_id, create=True)
@@ -3577,6 +3912,8 @@ class ChatScreen(Screen):
                 raw_for_builtin = raw_content
                 if clawteam_ns is not None:
                     raw_for_builtin = f"/clawteam {tail}"
+                if designteam_ns is not None:
+                    raw_for_builtin = f"/designteam {tail}"
                 asyncio.create_task(
                     self._run_builtin_slash_send(
                         raw_for_builtin,
@@ -3609,6 +3946,8 @@ class ChatScreen(Screen):
                         self._refresh_slash_skill_autocomplete()
                     return
                 content_for_agent = slash.llm_user_text
+
+        content_for_agent = self._apply_ui_style_prefix(raw_content, content_for_agent)
 
         self._finalize_send_after_input(
             display_content=display_content,
@@ -3718,7 +4057,7 @@ class ChatScreen(Screen):
             # The RESPONSE handler's call_later fires while is_processing is still True
             # (due to asyncio.sleep(0) yield points), so this finally-based call is the
             # reliable path — mirrors plan_task's _run_next_plan_task pattern below.
-            self.call_later(lambda sid=session_id: self._continue_clawteam_deep_loop_if_needed(sid))
+            self.call_later(lambda sid=session_id: self._continue_any_deep_loop_if_needed(sid))
 
             if build_idx_snapshot >= 0:
                 await self._recover_stale_plan_task_after_run(session_id, build_idx_snapshot)
@@ -3760,6 +4099,39 @@ class ChatScreen(Screen):
         if not res.get("skipped"):
             clawteam_deeploop_clear_pending(session_id)
 
+    def _maybe_finalize_designteam_deeploop_from_assistant(
+        self, session_id: str, assistant_plain: str
+    ) -> None:
+        if "DEEP_LOOP_WRITEBACK_JSON:" not in (assistant_plain or ""):
+            return
+        if not bool(getattr(self.settings.closed_loop, "designteam_deeploop_auto_writeback_enabled", True)):
+            return
+        meta = designteam_deeploop_get_pending(session_id)
+        if not meta:
+            return
+        tecap_id = str(meta.get("tecap_id") or "").strip()
+        if not tecap_id:
+            return
+        from ...learning.service import LearningService
+
+        role_raw = meta.get("role_ecap_map")
+        role_ecap_map: dict[str, str] = (
+            {str(k): str(v) for k, v in dict(role_raw).items()} if isinstance(role_raw, dict) else {}
+        )
+        svc = LearningService(self.settings)
+        res = svc.finalize_clawteam_deeploop_from_output(
+            tecap_id=tecap_id,
+            role_ecap_map=role_ecap_map,
+            output_text=assistant_plain,
+            trace_id=str(meta.get("trace_id") or ""),
+            cycle_id=str(meta.get("cycle_id") or ""),
+            policy_id=str(meta.get("policy_id") or ""),
+            domain=str(meta.get("domain") or ""),
+            experiment_id=str(meta.get("experiment_id") or ""),
+        )
+        if not res.get("skipped"):
+            designteam_deeploop_clear_pending(session_id)
+
     async def _handle_agent_event(self, session_id: str, run_id: str, event: AgentEvent) -> None:
         """Handle an agent event.
 
@@ -3799,6 +4171,9 @@ class ChatScreen(Screen):
         _dl_state = self._clawteam_loop_store().get(session_id)
         if isinstance(_dl_state, dict):
             _dl_state["last_activity_at"] = time.monotonic()
+        _dt_dl_state = self._designteam_loop_store().get(session_id)
+        if isinstance(_dt_dl_state, dict):
+            _dt_dl_state["last_activity_at"] = time.monotonic()
 
         match event.type:
             case AgentEventType.USAGE:
@@ -4030,13 +4405,20 @@ class ChatScreen(Screen):
                 msg = event.message
                 if msg:
                     message_list.finalize_message(msg)
-                    self._clawteam_last_response_store()[session_id] = msg.content or ""
+                    if session_id in self._designteam_deep_loop_state:
+                        self._designteam_last_response_store()[session_id] = msg.content or ""
+                    elif session_id in self._clawteam_deep_loop_state:
+                        self._clawteam_last_response_store()[session_id] = msg.content or ""
                     try:
                         self._maybe_finalize_clawteam_deeploop_from_assistant(session_id, msg.content or "")
                     except Exception:
                         _logger.exception("clawteam deeploop finalize hook failed")
+                    try:
+                        self._maybe_finalize_designteam_deeploop_from_assistant(session_id, msg.content or "")
+                    except Exception:
+                        _logger.exception("designteam deeploop finalize hook failed")
                     # Continue deep loop only after run lock is released in _process_message.finally.
-                    self.call_later(lambda sid=session_id: self._continue_clawteam_deep_loop_if_needed(sid))
+                    self.call_later(lambda sid=session_id: self._continue_any_deep_loop_if_needed(sid))
                 elif run_state is not None and run_state.build_task_index >= 0:
                     message_list.finalize_message()
 

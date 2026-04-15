@@ -953,7 +953,7 @@ class AgentTool(BaseTool):
         if not dfn:
             candidates = sorted(registry.keys())
             if candidates:
-                # Prefer same family (e.g. clawteam-*) when available.
+                # Prefer same family (e.g. clawteam-* / designteam-*) when available.
                 prefix = key.split("-", 1)[0]
                 scoped = [c for c in candidates if c.startswith(prefix + "-")]
                 pool = scoped or candidates

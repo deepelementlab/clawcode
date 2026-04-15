@@ -273,6 +273,40 @@ def builtin_agent_definitions() -> dict[str, AgentDefinition]:
             tools=tools,
             source="builtin",
         )
+    designteam_roles: dict[str, tuple[str, list[str]]] = {
+        "designteam-user-researcher": (
+            "User research framing, evidence, personas, and journey inputs.",
+            ["Read", "Glob", "Grep", "Bash", "diagnostics"],
+        ),
+        "designteam-interaction-designer": (
+            "Flows, IA, states, and interaction specifications.",
+            ["Read", "Glob", "Grep", "Bash", "diagnostics"],
+        ),
+        "designteam-ui-designer": (
+            "UI structure, patterns, components, and visual hierarchy.",
+            ["Read", "Glob", "Grep", "Bash", "diagnostics"],
+        ),
+        "designteam-product-designer": (
+            "Problem frame, outcomes, scope, and UX prioritization.",
+            ["Read", "Glob", "Grep", "Bash", "diagnostics"],
+        ),
+        "designteam-visual-ops-designer": (
+            "Brand-aligned visuals and growth or marketing surfaces.",
+            ["Read", "Glob", "Grep", "Bash", "diagnostics"],
+        ),
+        "designteam-experience-design-expert": (
+            "Experience principles, review, accessibility posture, and risk synthesis.",
+            ["Read", "Glob", "Grep", "Bash", "diagnostics"],
+        ),
+    }
+    for role, (desc, tools) in designteam_roles.items():
+        defs[role] = AgentDefinition(
+            name=role,
+            description=desc,
+            prompt=f"You are the {role} role in designteam. Execute role tasks and report concrete outputs.",
+            tools=tools,
+            source="builtin",
+        )
     return defs
 
 

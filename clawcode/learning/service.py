@@ -1258,6 +1258,23 @@ class LearningService:
             "consistency_min": self._cl_float("clawteam_deeploop_consistency_min", 0.0),
         }
 
+    def get_designteam_deeploop_config(self) -> dict[str, Any]:
+        return {
+            "enabled": bool(getattr(self.settings.closed_loop, "designteam_deeploop_enabled", True)),
+            "max_iters": int(getattr(self.settings.closed_loop, "designteam_deeploop_max_iters", 100) or 100),
+            "min_gap_delta": self._cl_float("designteam_deeploop_min_gap_delta", 0.05),
+            "convergence_rounds": int(getattr(self.settings.closed_loop, "designteam_deeploop_convergence_rounds", 2) or 2),
+            "handoff_target": self._cl_float("designteam_deeploop_handoff_target", 0.85),
+            "critical_degrade_enabled": bool(
+                getattr(self.settings.closed_loop, "designteam_deeploop_critical_degrade_enabled", True)
+            ),
+            "auto_writeback_enabled": bool(
+                getattr(self.settings.closed_loop, "designteam_deeploop_auto_writeback_enabled", True)
+            ),
+            "max_rollbacks": int(getattr(self.settings.closed_loop, "designteam_deeploop_max_rollbacks", 2) or 2),
+            "consistency_min": self._cl_float("designteam_deeploop_consistency_min", 0.0),
+        }
+
     def retrieve_team_capsules_for_clawteam(
         self,
         *,
@@ -1295,10 +1312,18 @@ class LearningService:
             r = str(role).strip()
             if not r:
                 continue
+            rl = r.lower()
+            stem = rl
+            for prefix in ("clawteam-", "designteam-"):
+                if stem.startswith(prefix):
+                    stem = stem[len(prefix) :].replace("-", " ")
+                    break
+            else:
+                stem = stem.replace("-", " ")
             hit = None
             for cap in base:
                 txt = f"{cap.title} {cap.knowledge_triple.skill_ref.skill_name} {cap.problem_type}".lower()
-                if r.replace("clawteam-", "").replace("-", " ") in txt or r.lower() in txt:
+                if stem in txt or rl in txt:
                     hit = cap
                     break
             if hit is None and base:

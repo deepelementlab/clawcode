@@ -255,8 +255,16 @@ BUILTIN_SLASH_COMMANDS: list[tuple[str, str]] = [
         "Run multi-role task orchestration, or target one role via /clawteam:<agent>",
     ),
     (
+        "designteam",
+        "Product design orchestration (research, IXD, UI, PD, visual/ops, XD) via /designteam:<agent>",
+    ),
+    (
         "clawteam-deeploop-finalize",
         "Parse DEEP_LOOP_WRITEBACK_JSON from pasted or last assistant text using pending deep-loop session metadata",
+    ),
+    (
+        "designteam-deeploop-finalize",
+        "Parse DEEP_LOOP_WRITEBACK_JSON for designteam deep loop using pending session metadata",
     ),
     (
         "multi-plan",
@@ -560,6 +568,7 @@ class BuiltinSlashOutcome:
         "switch_to_session_id",
         "routing_meta",
         "clawteam_deeploop_meta",
+        "designteam_deeploop_meta",
     )
 
     def __init__(
@@ -577,6 +586,7 @@ class BuiltinSlashOutcome:
         switch_to_session_id: str | None = None,
         routing_meta: dict | None = None,
         clawteam_deeploop_meta: dict | None = None,
+        designteam_deeploop_meta: dict | None = None,
     ) -> None:
         self.kind = kind
         self.assistant_text = assistant_text
@@ -590,3 +600,4 @@ class BuiltinSlashOutcome:
         self.switch_to_session_id = switch_to_session_id
         self.routing_meta = routing_meta or {}
         self.clawteam_deeploop_meta = clawteam_deeploop_meta
+        self.designteam_deeploop_meta = designteam_deeploop_meta
