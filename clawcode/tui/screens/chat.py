@@ -1391,12 +1391,19 @@ class ChatScreen(Screen):
     def _update_status_bars(self, *, refresh_hud: bool = True) -> None:
         """Update top and bottom status bars (CSS decides which is visible).
 
-        When ``refresh_hud`` is False, only the classic top bar is refreshed ????used by the
-        processing spinner timer so the multi-line HUD is not repainted every 200ms
+        When ``refresh_hud`` is False, only the classic top bar is refreshed — used by the
+        processing spinner timer so the multi-line HUD is not repainted every 300ms
         (reduces flicker / jitter).
         """
+        # Cache DOM references to avoid repeated query_one calls.
+        if not hasattr(self, "_status_bar_cache"):
+            self._status_bar_cache: Static | None = None
+            self._hud_bar_cache: HudBar | None = None
+
         try:
-            bar = self.query_one("#chat_status_bar", Static)
+            if self._status_bar_cache is None:
+                self._status_bar_cache = self.query_one("#chat_status_bar", Static)
+            bar = self._status_bar_cache
 
             # Session title: keep tail for long titles.
             session_label = self._current_session_title or self.current_session_id or "New session"
@@ -1452,7 +1459,9 @@ class ChatScreen(Screen):
             return
 
         try:
-            bottom = self.query_one("#bottom_status_bar", HudBar)
+            if self._hud_bar_cache is None:
+                self._hud_bar_cache = self.query_one("#bottom_status_bar", HudBar)
+            bottom = self._hud_bar_cache
 
             agent_config = self.settings.get_agent_config("coder")
             model = agent_config.model or "Unknown"
@@ -1586,7 +1595,7 @@ class ChatScreen(Screen):
             self._update_status_bars(refresh_hud=False)
 
         # Keep status bar spinner updated while processing.
-        self._processing_timer = self.set_interval(0.2, _tick)
+        self._processing_timer = self.set_interval(0.3, _tick)
 
     def _run_build_watchdog(self) -> None:
         now_ts = int(time.time())

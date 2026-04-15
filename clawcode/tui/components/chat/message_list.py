@@ -214,7 +214,7 @@ class MessageList(ScrollableContainer):
         # Windows terminals after long runs.
         self._scroll_end_after_refresh_pending: bool = False
         # Throttle scroll_end calls during streaming to prevent event queue flooding.
-        self._scroll_end_throttle_interval = 0.05  # 50ms
+        self._scroll_end_throttle_interval = 0.08  # 80ms
         self._last_scroll_end_time = 0.0
         # Batch tool finalizers to reduce call_after_refresh overhead.
         self._pending_tool_finalizers: list = []
@@ -223,6 +223,9 @@ class MessageList(ScrollableContainer):
     def on_mount(self) -> None:
         # A lightweight "New output" hint near bottom (Claude Code-like)
         self._ensure_output_hint()
+        # Single centralized pulse timer for all unfinalized tool widgets.
+        # Replaces per-widget set_interval to avoid N independent timers causing refresh storms.
+        self._shared_pulse_timer = self.set_interval(0.35, self._pulse_all_tools)
 
     def _ensure_output_hint(self) -> None:
         if self._new_output_hint is not None:
@@ -231,6 +234,31 @@ class MessageList(ScrollableContainer):
         self._new_output_hint.can_focus = False
         self._new_output_hint.display = False
         self.mount(self._new_output_hint)
+
+    def _pulse_all_tools(self) -> None:
+        """Centralized pulse for all unfinalized tool result widgets.
+
+        Replaces per-widget ``set_interval`` to avoid N independent timers
+        causing refresh storms when many tools run concurrently.
+        """
+        has_active = False
+        for w in self._tool_results.values():
+            if not w._finalized:
+                has_active = True
+                w._pulse_frame = (w._pulse_frame + 1) % 7
+                w.refresh(layout=False)
+        # Stop the shared timer when no tools are active to save CPU.
+        if not has_active and self._shared_pulse_timer is not None:
+            try:
+                self._shared_pulse_timer.stop()
+            except Exception:
+                pass
+            self._shared_pulse_timer = None
+
+    def _ensure_pulse_timer(self) -> None:
+        """Restart the shared pulse timer if it was stopped and a new tool is active."""
+        if self._shared_pulse_timer is None:
+            self._shared_pulse_timer = self.set_interval(0.35, self._pulse_all_tools)
 
     def _at_bottom(self) -> bool:
         try:
@@ -412,6 +440,7 @@ class MessageList(ScrollableContainer):
                 self._messages.append(msg)
                 self.mount(msg)
                 self._enforce_message_limit()
+                self._ensure_pulse_timer()
                 self.scroll_end()
 
     def add_tool_result(
@@ -441,6 +470,7 @@ class MessageList(ScrollableContainer):
             self._messages.append(msg)
             self.mount(msg)
             self._enforce_message_limit()
+            self._ensure_pulse_timer()
             existing = msg
         self._last_tool_key = key
 
@@ -700,6 +730,7 @@ class _AssistantMessageWidget(_MessageWidget):
         """Append content (throttled refresh to avoid O(n^2) Markdown re-parse)."""
         self._content.append(content)
         self._content_dirty = True
+        self._render_needs_rebuild = True  # invalidate render cache
         now = time.monotonic()
         if now - self._last_render_at >= self._REFRESH_INTERVAL:
             self._last_render_at = now
@@ -723,16 +754,22 @@ class _AssistantMessageWidget(_MessageWidget):
 
     def add_tool_call(self, tool_name: str, tool_input: dict | str) -> None:
         self._tool_calls.append((tool_name, tool_input))
+        self._render_needs_rebuild = True
         # Tool calls change widget height — layout pass needed.
         self.refresh(layout=True)
 
     def finalize(self, message: Any | None = None) -> None:
         self._finalized = True
         self._pending_refresh = False
+        self._render_needs_rebuild = True
         # Final render must recalculate height (streaming layout=False left it stale).
         self.refresh(layout=True)
 
     def render(self) -> RenderableType:
+        # Fast path: return cached renderable when nothing changed.
+        if not self._render_needs_rebuild and self._cached_renderable is not None:
+            return self._cached_renderable
+
         parts: list[RenderableType] = []
 
         if self._content:
@@ -760,7 +797,10 @@ class _AssistantMessageWidget(_MessageWidget):
         if not parts:
             return ""
 
-        return Group(*parts)
+        result = Group(*parts)
+        self._cached_renderable = result
+        self._render_needs_rebuild = False
+        return result
 
 
 class _MediaPlaceholderWidget(Widget):
@@ -888,7 +928,7 @@ class _ThinkingMessageWidget(_MessageWidget):
     }
     """
 
-    _REFRESH_INTERVAL = 0.08
+    _REFRESH_INTERVAL = 0.15
     _MAX_COLLAPSED = 4
 
     def __init__(self, **kwargs: Any) -> None:
@@ -903,7 +943,8 @@ class _ThinkingMessageWidget(_MessageWidget):
         now = time.monotonic()
         if now - self._last_render_at >= self._REFRESH_INTERVAL:
             self._last_render_at = now
-            self.refresh(layout=True)
+            # layout=False during streaming to avoid full parent layout recalculation.
+            self.refresh(layout=False)
 
     def finalize(self) -> None:
         self._finalized = True
@@ -990,16 +1031,8 @@ class _ToolResultWidget(_MessageWidget):
         self._elapsed: float | None = None
         self._timeout: bool = False
         self._pulse_frame: int = 0
-        self._pulse_timer = None  # saved so finalize() can stop it
 
-    def on_mount(self) -> None:
-        self._pulse_timer = self.set_interval(0.35, self._on_pulse)
-
-    def _on_pulse(self) -> None:
-        if self._finalized:
-            return
-        self._pulse_frame = (self._pulse_frame + 1) % 7
-        self.refresh(layout=False)
+    # Pulse timer removed from individual widgets — managed centrally by MessageList._pulse_all_tools
 
     # Data mutation (public API used by MessageList)
 
@@ -1010,7 +1043,7 @@ class _ToolResultWidget(_MessageWidget):
             return
         self.result += f"\n[[{tag}]]{normalized}"
         now = time.monotonic()
-        if now - self._last_render_at >= 0.05:
+        if now - self._last_render_at >= 0.10:
             self._last_render_at = now
             # layout=False during streaming: panel border/title height is fixed.
             self.refresh(layout=False)
@@ -1024,13 +1057,7 @@ class _ToolResultWidget(_MessageWidget):
         if self._finalized:
             return
         self._finalized = True
-        # Stop the pulse timer — no more animation frames needed.
-        if self._pulse_timer is not None:
-            try:
-                self._pulse_timer.stop()
-            except Exception:
-                pass
-            self._pulse_timer = None
+        # Pulse timer managed centrally by MessageList — no per-widget cleanup needed.
         if self.is_mounted:
             self.refresh(layout=True)
 
