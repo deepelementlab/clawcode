@@ -113,9 +113,14 @@ In one line: DesignTeam is ClawCode’s product-design pipeline as a first-class
 |-----------|----------------------------|-------------------------|
 | Deliverable | Fragmented tips, single-turn replies | **Structured system design doc** + phased artifacts, cumulative and reviewable |
 | Roles | Implicit single persona | **Explicit multi-agent roster** (Tier‑1: research, IXD, UI, product, visual/ops, experience)—orchestrator picks a **minimal sufficient** set |
-| Context & memory | Prompt-only | **TECAP + role ECAP** retrieval, plus optional `.claw/design/designteam/*.yaml` context |
+| Context & memory & design experience evolution | Prompt-only | **ECAP** retrieval-augmented and closed-loop learning, plus optional `.claw/design/designteam/*.yaml` context |
 | Boundary with engineering | Often blurred with "just build it" | Clear split vs **`/clawteam`**: DesignTeam = **design docs & specs**; ClawTeam = **implementation & engineering delivery** |
 | Multi-turn closure | Rare or ad hoc | **`/designteam --deep_loop`**: **7-phase design workflow** with outer-loop iterations; **`DEEP_LOOP_EVAL_JSON` / `DEEP_LOOP_WRITEBACK_JSON`** for machine-readable convergence and learning-service writeback |
+
+Spec + Intelligent Team Orchestration + Intelligent Workflow + Collaborative Development
+
+<img width="2071" height="1739" alt="Screenshot - 2026-04-17 13 56 00" src="https://github.com/user-attachments/assets/a774b2cb-2b2e-4020-babf-f76f4d435208" />
+
 
 ## Development assistance functions
 
