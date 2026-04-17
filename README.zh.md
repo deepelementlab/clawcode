@@ -143,15 +143,16 @@ Spec + 智能团队编排 + 智能工作流 + 协作开发
 
 “立体开发任务”不是单一代码生成动作，而是把**规划、编码、验证、评审、环境操作、经验沉淀**串成同一条可执行链路。ClawCode 在实现上可分为三层执行栈：
 
-| 执行层 | 能力说明 | 关键组件 / 命令 | 典型任务 | 入口 |
-|---|---|---|---|---|
-| Claw 框架层（Agent 运行时） | 在 Claw 模式下通过 `ClawAgent` 承接多轮任务执行，保持与主 Agent 循环一致，并支持迭代预算与子任务协作约束 | `/claw`、`ClawAgent.run_claw_turn`、`run_agent / run_conversation` | 复杂任务分阶段推进、跨轮上下文保持、受控多轮执行 | `docs/CLAW_MODE.md`、`clawcode/llm/claw.py` |
-| 工具编排层（工程执行） | 通过 slash 命令与工具调用完成从规划到交付的流程化执行，覆盖协作、评审、诊断、学习闭环 | `/clawteam`、`/architect`、`/tdd`、`/code-review`、`/orchestrate`、`/multi-*` | 需求分解、实现、测试、审查、收敛回写一体化推进 | `clawcode/tui/builtin_slash.py`、`docs/CLAWTEAM_SLASH_GUIDE.md` |
-| Computer Use 扩展层（OS 级操作） | 在开启 `desktop.enabled` 后提供 `desktop_*` 工具，实现截图、鼠标、键盘等桌面级自动化；与 `browser_*` 场景互补 | `desktop_screenshot`、`desktop_click`、`desktop_type`、`desktop_key`、`/doctor` | 跨应用操作、桌面环境检查、GUI 辅助验证 | `docs/DESKTOP_TOOLS.md`、`docs/CLAW_MODE.md`（Desktop tools） |
+| 执行层 | 能力说明 | 关键组件 / 命令 | 典型任务 |
+|---|---|---|---|
+| Coder agent (默认)	| Coder Agent 是 ClawCode 的核心 AI 智能体，基于 ReAct 循环运行，集成了文件操作、Shell 执行、代码搜索、诊断、子代理委派等丰富工具。核心能力包括：多轮工具调用、子代理生成、Claw 模式工作流、闭环学习、上下文自动压缩、Hook 集成及权限感知执行。支持灵活的后端模型，是覆盖规划、编码、验证与审查的全栈开发终端。|ChatScreen, _finalize_send_after_input, _start_agent_run, _process_message, build_coder_runtime, make_claw_agent / make_plain_agent, Agent.run, ClawAgent.run_claw_turn, _handle_agent_event, _rebuild_llm_stack|Everyday coding in the terminal: chat turns, file edits via tools, plan-style flows when /plan is active, model switch (e.g. Ctrl+O stack rebuild), non-Claw and Claw branches from the same screen|
+| Claw 框架层（Agent 运行时） | 在 Claw 模式下通过 `ClawAgent` 承接多轮任务执行，保持与主 Agent 循环一致，并支持迭代预算与子任务协作约束 | `/claw`、`ClawAgent.run_claw_turn`、`run_agent / run_conversation` | 复杂任务分阶段推进、跨轮上下文保持、受控多轮执行 |
+| 工具编排层（工程执行） | 通过 slash 命令与工具调用完成从规划到交付的流程化执行，覆盖协作、评审、诊断、学习闭环 | `/clawteam`、`/architect`、`/tdd`、`/code-review`、`/orchestrate`、`/multi-*` | 需求分解、实现、测试、审查、收敛回写一体化推进 |
+| Computer Use 扩展层（OS 级操作） | 在开启 `desktop.enabled` 后提供 `desktop_*` 工具，实现截图、鼠标、键盘等桌面级自动化；与 `browser_*` 场景互补 | `desktop_screenshot`、`desktop_click`、`desktop_type`、`desktop_key`、`/doctor` | 跨应用操作、桌面环境检查、GUI 辅助验证 |
 
 > 说明：`desktop_*` 默认关闭，需显式启用并安装可选依赖（如 `pip install -e ".[desktop]"` 或等价 extras 安装方式）；建议在最小权限与可控环境下使用。
 
-这也是 ClawCode 将“终端执行能力 + 团队编排 + 经验进化”放在同一产品框架中的原因：它希望成为长期可用、可成长的工程伙伴，而不只是短时问答工具。
+这也是 ClawCode 将“终端执行能力 + 团队编排 + 经验进化”放在同一产品框架中的原因：它希望成为长期可用、可成长的工程伙伴。
 
 ---
 
