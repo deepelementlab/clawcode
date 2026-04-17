@@ -1,10 +1,34 @@
-# ClawCode
+<p align="center">
+ <img width="256" height="256" alt="Screenshot - 2026-03-26 20 36 43" src="https://github.com/user-attachments/assets/03466089-8b3d-47f8-a454-06a8874eb727" />
+</p>
+
+<h1 align="center">ClawCode</h1>
+
+<p align="center">
+  <strong>Your creative dev tool , AI coding Swiss Army knife</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/deepelementlab/clawcode/releases">
+   <img
+     src="https://img.shields.io/static/v1?style=flat&label=release&labelColor=6A737D&color=fe7d37&message=v0.1.2"
+     alt="Release v0.1.2"
+   />
+  </a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-GPL%20OR%20Apache%202.0-blue.svg" alt="License: GPL-3.0" /></a>
+  <a href="https://github.com/deepelementlab/clawcode/wiki"><img src="https://img.shields.io/badge/Wiki-documentation-26A5E4?style=flat&logo=github&logoColor=white"alt="Documentation Wiki"/></a>
+  <a href="https://gitcgr.com/deepelementlab/clawcode">
+    <img src="https://gitcgr.com/badge/nearai/clawcode.svg" alt="gitcgr" />
+  </a>
+</p>
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.zh.md">简体中文</a> 
+</p>
 
 ClawCode 是一个受 Claude Code 启发、用 Python 和 Rust 实现的工具，专注于代理（agent）与基于经验的进化。同时，它也是一个开源的编码代理 CLI，支持 Anthropic、OpenAI、Gemini、DeepSeek、GLM、Kimi、Ollama、Codex、GitHub Models，以及通过兼容 OpenAI 的 API 使用的 200 多种模型。
 
 <img width="2549" height="930" alt="Screenshot - 2026-03-30 18 47 15" src="https://github.com/user-attachments/assets/6cc0814a-aa3e-4f56-98dc-5123ecf88a1c" />
-
-[English](README.md) · **简体中文（本页）**
 
 我们希望让把它打造为一个开放且优秀的创意开发工具——成为你手中一把出色的AI编程“瑞士军刀”。
 
