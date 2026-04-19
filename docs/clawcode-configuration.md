@@ -374,10 +374,12 @@ Use `.env` in the project root for local overrides without exporting globals.
 
 | Topic | Location |
 |-------|----------|
-| Project overview & quick start | [`clawcode/README.md`](../README.md) |
-| Primary storage root (`.claw`) | [`clawcode/.claw/README.md`](../.claw/README.md) |
-| Default data dir (`.clawcode`) | [`clawcode/.clawcode/README.md`](../.clawcode/README.md) |
-| Claude-compatible tree | [`clawcode/.claude/README.md`](../.claude/README.md) |
+| Project overview & quick start | [`README.md`](../README.md) |
+| Architecture | [`docs/architecture.md`](./architecture.md) |
+| Agent & team orchestration | [`docs/agent-team-orchestration.md`](./agent-team-orchestration.md) |
+| ECAP/TECAP learning | [`docs/ecap-learning.md`](./ecap-learning.md) |
+| Slash commands reference | [`docs/slash-commands.md`](./slash-commands.md) |
+| Primary storage root (`.claw`) | [`.claw/README.md`](../.claw/README.md) |
 | Settings schema (source of truth) | `clawcode/clawcode/config/settings.py` |
 | Storage merge order | `clawcode/clawcode/storage_paths.py` |
 
