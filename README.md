@@ -35,7 +35,7 @@
 ---
 
 <p align="center">
-  <img width="2549" height="930" alt="ClawCode screenshot" src="https://github.com/user-attachments/assets/14042063-5545-40c4-a1d8-141f8ea6c765" />
+ <img width="1937" height="503" alt="Screenshot - 2026-04-01 20 09 39" src="https://github.com/user-attachments/assets/f8433995-74fc-41d5-a52a-18c68991e604" />
 </p>
 
 **ClawCode** is an open-source coding-agent CLI for Anthropic, OpenAI, Gemini, DeepSeek, GLM, Kimi, Ollama, Codex, GitHub Models, and **200+ models** via OpenAI-compatible APIs. It goes beyond code generation — it's a self-improving engineering partner.
