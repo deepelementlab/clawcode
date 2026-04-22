@@ -33,7 +33,7 @@ class WikiHistory:
         for line in reversed(lines):
             try:
                 row = json.loads(line)
-            except Exception:
+            except json.JSONDecodeError:
                 continue
             if page_path and row.get("page_path") != page_path:
                 continue
@@ -41,4 +41,3 @@ class WikiHistory:
             if len(out) >= max(1, limit):
                 break
         return out
-

@@ -351,7 +351,7 @@ class SpecSessionState:
 @dataclass
 class SaddleSessionState:
     session_id: str
-    mode: str = "idle"  # idle | spec_done | design_running | develop_running | completed | failed
+    mode: str = "idle"  # idle | running | completed | failed
     requirement: str = ""
     mode_name: str = "default"
     pipeline_session_id: str = ""
@@ -360,6 +360,25 @@ class SaddleSessionState:
     spec_dir: str = ""
     last_design_output: str = ""
     error: str = ""
+    # Mirrors saddle.modes.schema.ModeConfig pipeline (order + enabled flags).
+    stage_queue: list[str] = field(default_factory=list)
+    in_flight_team_stage: str | None = None  # "design" | "develop" while LLM run is active
+    stages_completed: list[str] = field(default_factory=list)
+
+
+def _saddle_executable_stages(mode: Any) -> list[str]:
+    """Match ``PipelineRunner.run`` stage filtering: ``pipeline.enabled`` + per-stage flags."""
+    if not getattr(mode.pipeline, "enabled", True):
+        return []
+    out: list[str] = []
+    for s in mode.pipeline.order:
+        if s == "spec" and mode.spec.enabled:
+            out.append("spec")
+        elif s == "design" and mode.design.enabled:
+            out.append("design")
+        elif s == "develop" and mode.develop.enabled:
+            out.append("develop")
+    return out
 
 
 @dataclass
@@ -703,103 +722,243 @@ class ChatScreen(Screen):
             raise ValueError("missing requirement for /saddle")
 
         from saddle.modes.resolver import resolve_mode
-        from saddle.orchestrator.team_service import TeamOrchestrationOptions, TeamService
-        from saddle.spec.service import SpecService
 
         root = Path((self.settings.working_directory or ".")).expanduser().resolve()
         resolved = resolve_mode(str(root), mode_name=mode_name, overrides=set_items or None)
-        spec_svc = SpecService(working_directory=str(root))
-        team_svc = TeamService(project_root=root)
+        stages = _saddle_executable_stages(resolved)
+        if not stages:
+            raise ValueError(
+                "Saddle pipeline has no enabled stages for this mode "
+                "(check pipeline.enabled and spec/design/develop in .saddle/modes)."
+            )
 
-        bundle = spec_svc.create_bundle(requirement, session_id=pipeline_sid)
-        spec_summary = (bundle.spec_markdown or "")[:400]
-        content = requirement
-        if spec_summary:
-            content += f"\n\nSpec summary:\n{spec_summary}"
-        design_result = team_svc.orchestrate(
-            "designteam",
-            content,
-            session_id=pipeline_sid,
-            options=TeamOrchestrationOptions(
-                selection_strategy=resolved.agent_selection.strategy,
-                thresholds=resolved.thresholds,
-                prompt_profile=resolved.design.prompt_profile,
-                custom_roles=resolved.agent_selection.custom_roles,
-                force_deep_loop=resolved.design.deep_loop,
-                force_max_iters=resolved.design.max_iters,
-            ),
-        )
-
-        state.mode = "design_running"
         state.requirement = requirement
         state.mode_name = mode_name
         state.pipeline_session_id = pipeline_sid
         state.set_items = set_items
-        state.spec_summary = spec_summary
-        state.spec_dir = bundle.spec_dir
+        state.spec_summary = ""
+        state.spec_dir = ""
         state.last_design_output = ""
         state.error = ""
+        state.stage_queue = list(stages)
+        state.in_flight_team_stage = None
+        state.stages_completed = []
+        state.mode = "running"
 
-        self._start_agent_run(
-            session_id=session_id,
-            display_content=f"[saddle/designteam] {requirement[:80]}",
-            content_for_agent=design_result.prompt,
-            attachments=None,
-            is_plan_run=False,
-            is_claw_run=False,
+        self._saddle_advance_pipeline(session_id, state)
+
+    def _saddle_fail_pipeline(self, session_id: str, state: SaddleSessionState, message: str) -> None:
+        state.mode = "failed"
+        state.error = message
+        state.in_flight_team_stage = None
+        message_list = self._ensure_message_list(session_id)
+        message_list.display = self.current_session_id == session_id
+        message_list.start_assistant_message()
+        message_list.update_content(message)
+        message_list.finalize_message()
+
+    def _saddle_emit_spec_stage_ui(self, session_id: str, bundle: Any) -> None:
+        """Show Saddle spec artifacts in a /spec-show-like layout (Saddle storage, not Clawcode SpecStore)."""
+        user_request = str(getattr(bundle, "user_request", "") or "")
+        spec_dir = str(getattr(bundle, "spec_dir", "") or "").rstrip("/\\")
+        tasks = getattr(bundle, "tasks", None) or []
+        checklist = getattr(bundle, "checklist", None) or []
+        n_tasks = len(tasks) if isinstance(tasks, list) else 0
+        n_chk = len(checklist) if isinstance(checklist, list) else 0
+        msg = (
+            f"**Spec (Saddle, not Clawcode /spec store):** {user_request}\n\n"
+            f"Tasks: {n_tasks} | Checklist: {n_chk} | stage: spec\n\n"
+            f"Spec file: `{spec_dir}/spec.md`\n"
+            f"Tasks file: `{spec_dir}/tasks.md`\n"
+            f"Checklist file: `{spec_dir}/checklist.md`"
         )
+        message_list = self._ensure_message_list(session_id)
+        message_list.display = self.current_session_id == session_id
+        message_list.add_user_message("/saddle · spec")
+        message_list.start_assistant_message()
+        message_list.update_content(msg)
+        message_list.finalize_message()
+
+    def _saddle_emit_team_stage_boundary(
+        self, session_id: str, flight: str, state: SaddleSessionState
+    ) -> None:
+        """Short assistant note after designteam/clawteam LLM stage completes."""
+        next_head = state.stage_queue[0] if state.stage_queue else None
+        if flight == "design":
+            user_line = "/saddle · designteam"
+            if next_head == "develop":
+                body = "**designteam** 阶段（Saddle 编排）已完成。接下来进入 **clawteam（develop）**。"
+            else:
+                body = "**designteam** 阶段（Saddle 编排）已完成。"
+        else:
+            user_line = "/saddle · clawteam"
+            body = "**clawteam（develop）** 阶段（Saddle 编排）已完成。"
+        message_list = self._ensure_message_list(session_id)
+        message_list.display = self.current_session_id == session_id
+        message_list.add_user_message(user_line)
+        message_list.start_assistant_message()
+        message_list.update_content(body)
+        message_list.finalize_message()
+
+    def _saddle_sync_drain_specs_at_front(self, session_id: str, state: SaddleSessionState) -> None:
+        from saddle.spec.service import SpecService
+
+        root = Path((self.settings.working_directory or ".")).expanduser().resolve()
+        spec_svc = SpecService(working_directory=str(root))
+        while state.stage_queue and state.stage_queue[0] == "spec":
+            bundle = spec_svc.create_bundle(state.requirement, session_id=state.pipeline_session_id)
+            state.spec_summary = (bundle.spec_markdown or "")[:400]
+            state.spec_dir = bundle.spec_dir
+            state.stage_queue.pop(0)
+            state.stages_completed.append("spec")
+            self._saddle_emit_spec_stage_ui(session_id, bundle)
+
+    def _saddle_team_content_base(self, state: SaddleSessionState) -> str:
+        content = state.requirement
+        if state.spec_summary:
+            content += f"\n\nSpec summary:\n{state.spec_summary}"
+        if state.last_design_output.strip():
+            content += f"\n\nDesign output summary:\n{state.last_design_output[:600]}"
+        return content
+
+    def _saddle_try_start_next_llm(self, session_id: str, state: SaddleSessionState) -> None:
+        from saddle.modes.resolver import resolve_mode
+        from saddle.orchestrator.team_service import TeamOrchestrationOptions, TeamService
+
+        root = Path((self.settings.working_directory or ".")).expanduser().resolve()
+        resolved = resolve_mode(str(root), mode_name=state.mode_name, overrides=state.set_items or None)
+        team_svc = TeamService(project_root=root)
+
+        if not state.stage_queue:
+            self._saddle_emit_completion_summary(session_id, state)
+            return
+
+        head = state.stage_queue[0]
+        if head == "spec":
+            self._saddle_sync_drain_specs_at_front(session_id, state)
+            if not state.stage_queue:
+                self._saddle_emit_completion_summary(session_id, state)
+                return
+            self._saddle_try_start_next_llm(session_id, state)
+            return
+        content = self._saddle_team_content_base(state)
+        try:
+            if head == "design":
+                design_result = team_svc.orchestrate(
+                    "designteam",
+                    content,
+                    session_id=state.pipeline_session_id,
+                    options=TeamOrchestrationOptions(
+                        selection_strategy=resolved.agent_selection.strategy,
+                        thresholds=resolved.thresholds,
+                        prompt_profile=resolved.design.prompt_profile,
+                        custom_roles=resolved.agent_selection.custom_roles,
+                        force_deep_loop=resolved.design.deep_loop,
+                        force_max_iters=resolved.design.max_iters,
+                    ),
+                )
+                state.in_flight_team_stage = "design"
+                state.last_design_output = ""
+                self._start_agent_run(
+                    session_id=session_id,
+                    display_content=f"[saddle/designteam] {state.requirement[:80]}",
+                    content_for_agent=design_result.prompt,
+                    attachments=None,
+                    is_plan_run=False,
+                    is_claw_run=False,
+                )
+            elif head == "develop":
+                develop_result = team_svc.orchestrate(
+                    "clawteam",
+                    content,
+                    session_id=state.pipeline_session_id,
+                    options=TeamOrchestrationOptions(
+                        selection_strategy=resolved.agent_selection.strategy,
+                        thresholds=resolved.thresholds,
+                        prompt_profile=resolved.develop.prompt_profile,
+                        custom_roles=resolved.agent_selection.custom_roles,
+                        force_deep_loop=resolved.develop.deep_loop,
+                        force_max_iters=resolved.develop.max_iters,
+                    ),
+                )
+                state.in_flight_team_stage = "develop"
+                self._start_agent_run(
+                    session_id=session_id,
+                    display_content=f"[saddle/clawteam] {state.requirement[:80]}",
+                    content_for_agent=develop_result.prompt,
+                    attachments=None,
+                    is_plan_run=False,
+                    is_claw_run=False,
+                )
+        except Exception as e:
+            stage_label = "designteam" if head == "design" else "clawteam"
+            self._saddle_fail_pipeline(
+                session_id,
+                state,
+                f"**/saddle failed ({stage_label} orchestration):** {e}",
+            )
+
+    def _saddle_emit_completion_summary(self, session_id: str, state: SaddleSessionState) -> None:
+        state.mode = "completed"
+        state.in_flight_team_stage = None
+        done = " -> ".join(state.stages_completed) if state.stages_completed else "(no stages)"
+        summary = (
+            "# Saddle pipeline completed\n\n"
+            f"- mode: `{state.mode_name}`\n"
+            f"- session_id: `{state.pipeline_session_id}`\n"
+            f"- spec_dir: `{state.spec_dir}`\n"
+            f"- stages: `{done}`\n"
+        )
+        message_list = self._ensure_message_list(session_id)
+        message_list.display = self.current_session_id == session_id
+        message_list.start_assistant_message()
+        message_list.update_content(summary)
+        message_list.finalize_message()
+
+    def _saddle_advance_pipeline(self, session_id: str, state: SaddleSessionState) -> None:
+        if state.mode == "failed":
+            return
+        try:
+            self._saddle_sync_drain_specs_at_front(session_id, state)
+        except Exception as e:
+            self._saddle_fail_pipeline(session_id, state, f"**/saddle failed (spec stage):** {e}")
+            return
+        if not state.stage_queue:
+            self._saddle_emit_completion_summary(session_id, state)
+            return
+        self._saddle_try_start_next_llm(session_id, state)
 
     def _continue_saddle_pipeline_if_needed(self, session_id: str) -> None:
         state = self._get_saddle_state(session_id, create=False)
-        if state is None:
+        if state is None or state.mode != "running":
             return
         run_state = self._get_run_state(session_id, create=False)
         if run_state is not None and run_state.is_processing:
             return
-        if state.mode != "design_running":
-            return
-        try:
-            from saddle.modes.resolver import resolve_mode
-            from saddle.orchestrator.team_service import TeamOrchestrationOptions, TeamService
 
-            root = Path((self.settings.working_directory or ".")).expanduser().resolve()
-            resolved = resolve_mode(str(root), mode_name=state.mode_name, overrides=state.set_items or None)
-            team_svc = TeamService(project_root=root)
-            content = state.requirement
-            if state.spec_summary:
-                content += f"\n\nSpec summary:\n{state.spec_summary}"
-            if state.last_design_output.strip():
-                content += f"\n\nDesign output summary:\n{state.last_design_output[:600]}"
-            develop_result = team_svc.orchestrate(
-                "clawteam",
-                content,
-                session_id=state.pipeline_session_id,
-                options=TeamOrchestrationOptions(
-                    selection_strategy=resolved.agent_selection.strategy,
-                    thresholds=resolved.thresholds,
-                    prompt_profile=resolved.develop.prompt_profile,
-                    custom_roles=resolved.agent_selection.custom_roles,
-                    force_deep_loop=resolved.develop.deep_loop,
-                    force_max_iters=resolved.develop.max_iters,
-                ),
-            )
-            state.mode = "develop_running"
-            self._start_agent_run(
-                session_id=session_id,
-                display_content=f"[saddle/clawteam] {state.requirement[:80]}",
-                content_for_agent=develop_result.prompt,
-                attachments=None,
-                is_plan_run=False,
-                is_claw_run=False,
-            )
-        except Exception as e:
-            state.mode = "failed"
-            state.error = str(e)
-            message_list = self._ensure_message_list(session_id)
-            message_list.display = self.current_session_id == session_id
-            message_list.start_assistant_message()
-            message_list.update_content(f"**/saddle failed (develop stage):** {e}")
-            message_list.finalize_message()
+        if state.in_flight_team_stage:
+            if run_state is not None and (run_state.last_error or "").strip():
+                stage = state.in_flight_team_stage
+                team = "designteam" if stage == "design" else "clawteam"
+                self._saddle_fail_pipeline(
+                    session_id,
+                    state,
+                    f"**/saddle failed ({team} LLM run):** {run_state.last_error}",
+                )
+                return
+            flight = state.in_flight_team_stage
+            popped_team_stage = False
+            if state.stage_queue and state.stage_queue[0] == flight:
+                state.stage_queue.pop(0)
+                done_label = "designteam" if flight == "design" else "clawteam"
+                state.stages_completed.append(done_label)
+                popped_team_stage = True
+            state.in_flight_team_stage = None
+            if popped_team_stage and flight in ("design", "develop"):
+                self._saddle_emit_team_stage_boundary(session_id, flight, state)
+            self._saddle_advance_pipeline(session_id, state)
+        else:
+            self._saddle_advance_pipeline(session_id, state)
 
     def _get_spec_store(self):
         if self._spec_store is None:
@@ -4789,21 +4948,8 @@ class ChatScreen(Screen):
                 if msg:
                     message_list.finalize_message(msg)
                     saddle_state = self._get_saddle_state(session_id, create=False)
-                    if saddle_state is not None:
-                        if saddle_state.mode == "design_running":
-                            saddle_state.last_design_output = msg.content or ""
-                        elif saddle_state.mode == "develop_running":
-                            saddle_state.mode = "completed"
-                            summary = (
-                                "# Saddle pipeline completed\n\n"
-                                f"- mode: `{saddle_state.mode_name}`\n"
-                                f"- session_id: `{saddle_state.pipeline_session_id}`\n"
-                                f"- spec_dir: `{saddle_state.spec_dir}`\n"
-                                "- stages: `spec -> designteam -> clawteam`\n"
-                            )
-                            message_list.start_assistant_message()
-                            message_list.update_content(summary)
-                            message_list.finalize_message()
+                    if saddle_state is not None and saddle_state.in_flight_team_stage == "design":
+                        saddle_state.last_design_output = msg.content or ""
                     if session_id in self._designteam_deep_loop_state:
                         self._designteam_last_response_store()[session_id] = msg.content or ""
                     elif session_id in self._clawteam_deep_loop_state:

@@ -1,3 +1,4 @@
+from ..observer import DeepNoteObserver
 from .wiki_ingest import WikiIngestTool, create_wiki_ingest_tool
 from .wiki_query import WikiQueryTool, create_wiki_query_tool
 from .wiki_lint import WikiLintTool, create_wiki_lint_tool
@@ -12,6 +13,7 @@ __all__ = [
     "WikiLinkTool",
     "WikiHistoryTool",
     "WikiOrientTool",
+    "DeepNoteObserver",
     "create_wiki_ingest_tool",
     "create_wiki_query_tool",
     "create_wiki_lint_tool",

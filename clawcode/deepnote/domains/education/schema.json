@@ -1,0 +1,72 @@
+{
+  "domain_id": "education",
+  "domain_name": "Education Knowledge Base",
+  "version": "1.0.0",
+  "description": "Education domain for courses, knowledge points, and learning paths",
+  "entities": [
+    {
+      "name": "Course",
+      "description": "Course description",
+      "fields": [
+        { "name": "course_code", "type": "string", "required": true },
+        { "name": "credits", "type": "number", "required": false },
+        { "name": "level", "type": "string", "required": false },
+        { "name": "prerequisites", "type": "list", "required": false }
+      ],
+      "required_fields": ["course_code"],
+      "icon": "book",
+      "color": "#8E44AD"
+    },
+    {
+      "name": "KnowledgePoint",
+      "description": "Specific knowledge item",
+      "fields": [
+        { "name": "kp_id", "type": "string", "required": true },
+        { "name": "difficulty", "type": "string", "required": false },
+        { "name": "estimated_time", "type": "string", "required": false }
+      ],
+      "required_fields": ["kp_id"],
+      "icon": "knowledge",
+      "color": "#9B59B6"
+    },
+    {
+      "name": "LearningPath",
+      "description": "Learning path plan",
+      "fields": [
+        { "name": "path_id", "type": "string", "required": true },
+        { "name": "target_skill", "type": "string", "required": true },
+        { "name": "duration_days", "type": "number", "required": false }
+      ],
+      "required_fields": ["path_id", "target_skill"],
+      "icon": "path",
+      "color": "#5B2C6F"
+    }
+  ],
+  "relations": [
+    {
+      "name": "covers",
+      "source_type": "Course",
+      "target_type": "KnowledgePoint",
+      "relation_type": "one_to_many",
+      "description": "A course covers many knowledge points"
+    }
+  ],
+  "taxonomy_tags": ["course", "education", "learning", "knowledge", "curriculum"],
+  "search_config": {
+    "boost_fields": ["course_code", "kp_id", "target_skill"],
+    "synonyms": {
+      "课程": ["class", "course"],
+      "知识点": ["concept", "topic"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "course_code": "[A-Z]{2,4}\\d{3,4}",
+      "credits": "\\d+(?:\\.\\d)?\\s*学分",
+      "level": "(初级|中级|高级|L\\d)"
+    }
+  }
+}

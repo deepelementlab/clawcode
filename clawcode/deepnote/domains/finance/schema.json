@@ -1,0 +1,72 @@
+{
+  "domain_id": "finance",
+  "domain_name": "Finance Knowledge Base",
+  "version": "1.0.0",
+  "description": "Finance domain for products, transactions, and risk metrics",
+  "entities": [
+    {
+      "name": "FinancialProduct",
+      "description": "Financial instrument or product",
+      "fields": [
+        { "name": "product_code", "type": "string", "required": true },
+        { "name": "risk_level", "type": "string", "required": false },
+        { "name": "yield_rate", "type": "string", "required": false }
+      ],
+      "required_fields": ["product_code"],
+      "icon": "chart",
+      "color": "#27AE60"
+    },
+    {
+      "name": "Transaction",
+      "description": "Transaction record",
+      "fields": [
+        { "name": "transaction_id", "type": "string", "required": true },
+        { "name": "amount", "type": "number", "required": true },
+        { "name": "currency", "type": "string", "required": false },
+        { "name": "timestamp", "type": "date", "required": false }
+      ],
+      "required_fields": ["transaction_id", "amount"],
+      "icon": "exchange",
+      "color": "#16A085"
+    },
+    {
+      "name": "RiskIndicator",
+      "description": "Risk indicator metric",
+      "fields": [
+        { "name": "indicator_name", "type": "string", "required": true },
+        { "name": "value", "type": "number", "required": true },
+        { "name": "threshold", "type": "number", "required": false }
+      ],
+      "required_fields": ["indicator_name", "value"],
+      "icon": "alert",
+      "color": "#E67E22"
+    }
+  ],
+  "relations": [
+    {
+      "name": "traded_as",
+      "source_type": "FinancialProduct",
+      "target_type": "Transaction",
+      "relation_type": "one_to_many",
+      "description": "Product appears in multiple transactions"
+    }
+  ],
+  "taxonomy_tags": ["finance", "trading", "risk", "yield", "portfolio"],
+  "search_config": {
+    "boost_fields": ["product_code", "transaction_id", "yield_rate"],
+    "synonyms": {
+      "收益": ["yield", "return"],
+      "风险": ["risk", "volatility"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "amount": "[¥$€]\\s*\\d+(?:,\\d{3})*(?:\\.\\d{2})?",
+      "yield_rate": "\\d+(?:\\.\\d+)?\\s*%",
+      "product_code": "[A-Z]{2,6}\\d{3,6}"
+    }
+  }
+}

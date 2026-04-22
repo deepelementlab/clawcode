@@ -109,9 +109,14 @@ dev = [
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
 ]
+# DeepNote: real PDF text extraction for ``PDFKnowledgeImporter`` (``pip install -e ".[deepnote-pdf]"``).
+deepnote-pdf = [
+    "pypdf>=5.0.0",
+]
 
 [project.scripts]
 clawcode = "clawcode.cli.commands:cli"
+clawcode-deepnote-cycle = "clawcode.deepnote.cli:cycle_main"
 clawcode-autonomous-cycle = "clawcode.learning.autonomous_cycle_cli:main"
 clawcode-apply-team-round = "clawcode.learning.apply_team_round_cli:main"
 # Same as ``saddle`` from the ``saddle`` package after ``pip install -e ".[saddle]"`` (Typer CLI).

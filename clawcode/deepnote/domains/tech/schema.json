@@ -1,0 +1,70 @@
+{
+  "domain_id": "tech",
+  "domain_name": "Technology Knowledge Base",
+  "version": "1.0.0",
+  "description": "Technical knowledge domain for APIs, design patterns, and stacks",
+  "entities": [
+    {
+      "name": "APIEndpoint",
+      "description": "HTTP API endpoint",
+      "fields": [
+        { "name": "method", "type": "string", "required": true },
+        { "name": "path", "type": "string", "required": true },
+        { "name": "version", "type": "string", "required": false }
+      ],
+      "required_fields": ["method", "path"],
+      "icon": "api",
+      "color": "#3498DB"
+    },
+    {
+      "name": "DesignPattern",
+      "description": "Software design pattern",
+      "fields": [
+        { "name": "pattern_type", "type": "string", "required": true },
+        { "name": "language", "type": "string", "required": false },
+        { "name": "complexity", "type": "string", "required": false }
+      ],
+      "required_fields": ["pattern_type"],
+      "icon": "pattern",
+      "color": "#1ABC9C"
+    },
+    {
+      "name": "TechStack",
+      "description": "Tech stack component",
+      "fields": [
+        { "name": "category", "type": "string", "required": true },
+        { "name": "version", "type": "string", "required": false },
+        { "name": "license", "type": "string", "required": false }
+      ],
+      "required_fields": ["category"],
+      "icon": "stack",
+      "color": "#2ECC71"
+    }
+  ],
+  "relations": [
+    {
+      "name": "implemented_with",
+      "source_type": "APIEndpoint",
+      "target_type": "TechStack",
+      "relation_type": "many_to_many",
+      "description": "API endpoint implemented with stack components"
+    }
+  ],
+  "taxonomy_tags": ["api", "backend", "frontend", "pattern", "architecture", "stack"],
+  "search_config": {
+    "boost_fields": ["method", "path", "pattern_type"],
+    "synonyms": {
+      "endpoint": ["api", "route"],
+      "bug": ["issue", "defect"]
+    },
+    "stop_words": ["the", "and", "or"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "endpoint": "(GET|POST|PUT|DELETE|PATCH)\\s+(/[^\\s]*)",
+      "version": "v?\\d+\\.\\d+(?:\\.\\d+)?"
+    }
+  }
+}

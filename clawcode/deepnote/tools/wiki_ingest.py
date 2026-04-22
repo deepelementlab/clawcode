@@ -4,7 +4,12 @@ import json
 import re
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
+from ..observer import DeepNoteObserver
 from ..wiki_store import WikiStore
+
+logger = structlog.get_logger(__name__)
 
 if TYPE_CHECKING:
     from ...llm.tools.base import ToolCall, ToolContext
@@ -80,9 +85,19 @@ class WikiIngestTool:
         extract_entities = bool(args.get("extract_entities", True))
         max_entities = int(args.get("max_entities", 4) or 4)
         max_entities = max(0, min(max_entities, 12))
+        obs_input = {
+            "title": title,
+            "source_type": source_type,
+            "section": section,
+            "extract_entities": extract_entities,
+            "max_entities": max_entities,
+        }
 
-        store = WikiStore.from_settings(get_settings())
+        settings = get_settings()
+        store = WikiStore.from_settings(settings)
         try:
+            logger.info("deepnote_tool_invoke", tool="wiki_ingest", title=title, section=section)
+            DeepNoteObserver.record_pre("wiki_ingest", context, obs_input, settings=settings)
             raw_path = store.save_raw_source(
                 "articles" if source_type in {"url", "text"} else "papers",
                 title=title,
@@ -124,7 +139,18 @@ class WikiIngestTool:
                 "section": section,
                 "created_entities": created_entities,
             }
+            DeepNoteObserver.record_post(
+                "wiki_ingest",
+                context,
+                obs_input,
+                {"page": str(page), "created_entities": len(created_entities)},
+                settings=settings,
+                reasoning_effort="high" if created_entities else "medium",
+            )
             return ToolResponse.text(json.dumps(payload, ensure_ascii=False))
+        except Exception as exc:
+            DeepNoteObserver.record_post("wiki_ingest", context, obs_input, {"error": str(exc)}, settings=settings, is_error=True)
+            raise
         finally:
             store.close()
 

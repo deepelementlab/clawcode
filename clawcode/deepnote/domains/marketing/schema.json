@@ -1,0 +1,76 @@
+{
+  "domain_id": "marketing",
+  "domain_name": "Marketing Knowledge Base",
+  "version": "1.0.0",
+  "description": "Marketing domain for campaigns, audiences, and channels",
+  "entities": [
+    {
+      "name": "Campaign",
+      "description": "Marketing campaign",
+      "fields": [
+        { "name": "campaign_id", "type": "string", "required": true },
+        { "name": "name", "type": "string", "required": true },
+        { "name": "budget", "type": "string", "required": false },
+        { "name": "start_date", "type": "date", "required": false },
+        { "name": "end_date", "type": "date", "required": false },
+        { "name": "channel", "type": "string", "required": false }
+      ],
+      "required_fields": ["campaign_id", "name"],
+      "icon": "campaign",
+      "color": "#F39C12"
+    },
+    {
+      "name": "Customer",
+      "description": "Customer profile segment",
+      "fields": [
+        { "name": "customer_id", "type": "string", "required": true },
+        { "name": "segment", "type": "string", "required": false },
+        { "name": "ltv", "type": "number", "required": false },
+        { "name": "preferences", "type": "list", "required": false }
+      ],
+      "required_fields": ["customer_id"],
+      "icon": "customer",
+      "color": "#D68910"
+    },
+    {
+      "name": "Channel",
+      "description": "Marketing channel",
+      "fields": [
+        { "name": "channel_id", "type": "string", "required": true },
+        { "name": "type", "type": "string", "required": false },
+        { "name": "reach", "type": "number", "required": false },
+        { "name": "conversion_rate", "type": "string", "required": false }
+      ],
+      "required_fields": ["channel_id"],
+      "icon": "channel",
+      "color": "#B9770E"
+    }
+  ],
+  "relations": [
+    {
+      "name": "runs_on",
+      "source_type": "Campaign",
+      "target_type": "Channel",
+      "relation_type": "many_to_many",
+      "description": "Campaign can run on multiple channels"
+    }
+  ],
+  "taxonomy_tags": ["marketing", "campaign", "channel", "conversion", "roi"],
+  "search_config": {
+    "boost_fields": ["campaign_id", "customer_id", "channel_id"],
+    "synonyms": {
+      "转化率": ["conversion rate", "cvr"],
+      "投放": ["campaign", "promotion"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "budget": "\\d+(?:\\.\\d+)?\\s*(?:万|元|W|w|USD|CNY)?",
+      "conversion_rate": "\\d+\\.?\\d*\\s*%",
+      "roi": "ROI\\s*[:=]?\\s*\\d+\\.?\\d*(?::\\d*\\.?\\d*)?"
+    }
+  }
+}

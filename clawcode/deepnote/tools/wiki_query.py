@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
+from ..observer import DeepNoteObserver
 from ..wiki_store import WikiStore
+
+logger = structlog.get_logger(__name__)
 
 if TYPE_CHECKING:
     from ...llm.tools.base import ToolCall, ToolContext
@@ -38,12 +43,21 @@ class WikiQueryTool:
             return ToolResponse.error(json.dumps({"success": False, "error": "query is required"}, ensure_ascii=False))
         mode = str(args.get("mode", "hybrid") or "hybrid").strip().lower()
         limit = int(args.get("limit", 10) or 10)
-        limit = max(1, min(limit, 50))
+        limit = max(1, min(limit, 200))
+        obs_input = {"query": query, "mode": mode, "limit": limit}
 
-        store = WikiStore.from_settings(get_settings())
+        settings = get_settings()
+        store = WikiStore.from_settings(settings)
         try:
+            logger.info("deepnote_tool_invoke", tool="wiki_query", mode=mode, limit=limit)
+            DeepNoteObserver.record_pre("wiki_query", context, obs_input, settings=settings)
             results = store.query(query=query, mode=mode, limit=limit)
-            return ToolResponse.text(json.dumps({"success": True, "query": query, "mode": mode, "results": results}, ensure_ascii=False))
+            payload = {"success": True, "query": query, "mode": mode, "results": results}
+            DeepNoteObserver.record_post("wiki_query", context, obs_input, {"result_count": len(results)}, settings=settings)
+            return ToolResponse.text(json.dumps(payload, ensure_ascii=False))
+        except Exception as exc:
+            DeepNoteObserver.record_post("wiki_query", context, obs_input, {"error": str(exc)}, settings=settings, is_error=True)
+            raise
         finally:
             store.close()
 

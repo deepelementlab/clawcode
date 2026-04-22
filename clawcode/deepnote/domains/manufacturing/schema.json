@@ -1,0 +1,74 @@
+{
+  "domain_id": "manufacturing",
+  "domain_name": "Manufacturing Knowledge Base",
+  "version": "1.0.0",
+  "description": "Manufacturing domain for processes, quality checks, and equipment",
+  "entities": [
+    {
+      "name": "Process",
+      "description": "Manufacturing process definition",
+      "fields": [
+        { "name": "process_id", "type": "string", "required": true },
+        { "name": "version", "type": "string", "required": false },
+        { "name": "material", "type": "string", "required": false },
+        { "name": "steps", "type": "list", "required": false }
+      ],
+      "required_fields": ["process_id"],
+      "icon": "process",
+      "color": "#D35400"
+    },
+    {
+      "name": "QualityCheck",
+      "description": "Quality check rule",
+      "fields": [
+        { "name": "check_id", "type": "string", "required": true },
+        { "name": "standard", "type": "string", "required": false },
+        { "name": "tolerance", "type": "string", "required": false },
+        { "name": "method", "type": "string", "required": false }
+      ],
+      "required_fields": ["check_id"],
+      "icon": "quality",
+      "color": "#CA6F1E"
+    },
+    {
+      "name": "Equipment",
+      "description": "Equipment profile",
+      "fields": [
+        { "name": "equipment_id", "type": "string", "required": true },
+        { "name": "type", "type": "string", "required": false },
+        { "name": "maintenance_date", "type": "date", "required": false },
+        { "name": "status", "type": "string", "required": false }
+      ],
+      "required_fields": ["equipment_id"],
+      "icon": "machine",
+      "color": "#AF601A"
+    }
+  ],
+  "relations": [
+    {
+      "name": "checked_by",
+      "source_type": "Process",
+      "target_type": "QualityCheck",
+      "relation_type": "one_to_many",
+      "description": "A process can have many quality checks"
+    }
+  ],
+  "taxonomy_tags": ["manufacturing", "process", "quality", "equipment", "maintenance"],
+  "search_config": {
+    "boost_fields": ["process_id", "check_id", "equipment_id"],
+    "synonyms": {
+      "质检": ["quality check", "qa"],
+      "设备": ["equipment", "machine"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "process_id": "PRO-[A-Z]{2,4}-\\d{4}",
+      "equipment_id": "EQ-[A-Z]{2,4}-\\d{4,6}",
+      "tolerance": "±\\d+\\.?\\d*\\s*(?:mm|cm|m|kg|g)"
+    }
+  }
+}

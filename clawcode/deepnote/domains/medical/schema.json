@@ -1,0 +1,75 @@
+{
+  "domain_id": "medical",
+  "domain_name": "Medical Knowledge Base",
+  "version": "1.0.0",
+  "description": "Medical and healthcare knowledge domain",
+  "entities": [
+    {
+      "name": "Disease",
+      "description": "Medical condition or disease",
+      "fields": [
+        {
+          "name": "icd10_code",
+          "type": "string",
+          "required": true,
+          "validation_regex": "^[A-Z][0-9]{2}\\.[0-9]$"
+        },
+        {
+          "name": "symptoms",
+          "type": "list",
+          "required": true
+        }
+      ],
+      "required_fields": [
+        "icd10_code",
+        "symptoms"
+      ],
+      "icon": "medical",
+      "color": "#E74C3C"
+    }
+  ],
+  "relations": [
+    {
+      "name": "treated_by",
+      "source_type": "Disease",
+      "target_type": "Medication",
+      "relation_type": "one_to_many",
+      "description": "Disease can be treated by medications"
+    }
+  ],
+  "taxonomy_tags": [
+    "disease",
+    "medication",
+    "symptom",
+    "treatment",
+    "diagnosis"
+  ],
+  "search_config": {
+    "boost_fields": [
+      "icd10_code"
+    ],
+    "synonyms": {
+      "heart attack": [
+        "myocardial infarction",
+        "mi"
+      ]
+    },
+    "stop_words": [
+      "the",
+      "and",
+      "or"
+    ]
+  },
+  "ingest_config": {
+    "supported_formats": [
+      ".pdf",
+      ".docx",
+      ".txt",
+      ".csv"
+    ],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "icd10": "ICD-10:\\s*([A-Z][0-9]{2}\\.[0-9])"
+    }
+  }
+}

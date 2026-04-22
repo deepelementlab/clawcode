@@ -1,0 +1,76 @@
+{
+  "domain_id": "research",
+  "domain_name": "Research Knowledge Base",
+  "version": "1.0.0",
+  "description": "Research domain for papers, experiments, and datasets",
+  "entities": [
+    {
+      "name": "Paper",
+      "description": "Research paper metadata",
+      "fields": [
+        { "name": "doi", "type": "string", "required": true },
+        { "name": "title", "type": "string", "required": true },
+        { "name": "authors", "type": "list", "required": false },
+        { "name": "journal", "type": "string", "required": false },
+        { "name": "year", "type": "number", "required": false }
+      ],
+      "required_fields": ["doi", "title"],
+      "icon": "paper",
+      "color": "#117A65"
+    },
+    {
+      "name": "Experiment",
+      "description": "Experiment log",
+      "fields": [
+        { "name": "experiment_id", "type": "string", "required": true },
+        { "name": "hypothesis", "type": "string", "required": false },
+        { "name": "method", "type": "string", "required": false },
+        { "name": "results", "type": "string", "required": false },
+        { "name": "conclusion", "type": "string", "required": false }
+      ],
+      "required_fields": ["experiment_id"],
+      "icon": "experiment",
+      "color": "#148F77"
+    },
+    {
+      "name": "Dataset",
+      "description": "Research dataset",
+      "fields": [
+        { "name": "dataset_id", "type": "string", "required": true },
+        { "name": "size", "type": "string", "required": false },
+        { "name": "format", "type": "string", "required": false },
+        { "name": "source", "type": "string", "required": false }
+      ],
+      "required_fields": ["dataset_id"],
+      "icon": "dataset",
+      "color": "#0E6655"
+    }
+  ],
+  "relations": [
+    {
+      "name": "validated_by",
+      "source_type": "Paper",
+      "target_type": "Experiment",
+      "relation_type": "one_to_many",
+      "description": "A paper can be supported by experiments"
+    }
+  ],
+  "taxonomy_tags": ["research", "paper", "doi", "experiment", "dataset"],
+  "search_config": {
+    "boost_fields": ["doi", "experiment_id", "dataset_id"],
+    "synonyms": {
+      "论文": ["paper", "article"],
+      "实验": ["experiment", "trial"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "doi": "10\\.\\d{4,5}/[^\\s]+",
+      "year": "(?:19|20)\\d{2}",
+      "impact_factor": "IF\\s*[:=]?\\s*\\d+\\.?\\d*"
+    }
+  }
+}

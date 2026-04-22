@@ -1,0 +1,76 @@
+{
+  "domain_id": "realestate",
+  "domain_name": "Real Estate Knowledge Base",
+  "version": "1.0.0",
+  "description": "Real estate domain for properties, deals, and contracts",
+  "entities": [
+    {
+      "name": "Property",
+      "description": "Property listing",
+      "fields": [
+        { "name": "property_id", "type": "string", "required": true },
+        { "name": "address", "type": "string", "required": false },
+        { "name": "area", "type": "string", "required": false },
+        { "name": "price", "type": "string", "required": false },
+        { "name": "type", "type": "string", "required": false }
+      ],
+      "required_fields": ["property_id"],
+      "icon": "house",
+      "color": "#7D3C98"
+    },
+    {
+      "name": "Transaction",
+      "description": "Property transaction",
+      "fields": [
+        { "name": "transaction_id", "type": "string", "required": true },
+        { "name": "buyer", "type": "string", "required": false },
+        { "name": "seller", "type": "string", "required": false },
+        { "name": "date", "type": "date", "required": false },
+        { "name": "amount", "type": "string", "required": false }
+      ],
+      "required_fields": ["transaction_id"],
+      "icon": "deal",
+      "color": "#884EA0"
+    },
+    {
+      "name": "Contract",
+      "description": "Real estate contract",
+      "fields": [
+        { "name": "contract_id", "type": "string", "required": true },
+        { "name": "terms", "type": "list", "required": false },
+        { "name": "expiry_date", "type": "date", "required": false },
+        { "name": "status", "type": "string", "required": false }
+      ],
+      "required_fields": ["contract_id"],
+      "icon": "contract",
+      "color": "#6C3483"
+    }
+  ],
+  "relations": [
+    {
+      "name": "sold_by",
+      "source_type": "Property",
+      "target_type": "Transaction",
+      "relation_type": "one_to_many",
+      "description": "A property may have multiple transactions over time"
+    }
+  ],
+  "taxonomy_tags": ["realestate", "property", "contract", "transaction", "housing"],
+  "search_config": {
+    "boost_fields": ["property_id", "transaction_id", "contract_id"],
+    "synonyms": {
+      "房源": ["property", "listing"],
+      "合同": ["agreement", "contract"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "area": "\\d+(?:\\.\\d+)?\\s*(?:平方米|平米|m²)",
+      "price": "\\d+(?:\\.\\d+)?\\s*(?:万|元|W|w)",
+      "property_id": "[A-Z]{2}\\d{6,8}"
+    }
+  }
+}

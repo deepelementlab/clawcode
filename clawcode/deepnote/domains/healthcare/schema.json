@@ -1,0 +1,74 @@
+{
+  "domain_id": "healthcare",
+  "domain_name": "Healthcare Management Knowledge Base",
+  "version": "1.0.0",
+  "description": "Healthcare management domain for records, vitals, and medication",
+  "entities": [
+    {
+      "name": "HealthRecord",
+      "description": "Patient health record",
+      "fields": [
+        { "name": "record_id", "type": "string", "required": true },
+        { "name": "patient_name", "type": "string", "required": false },
+        { "name": "birth_date", "type": "date", "required": false },
+        { "name": "blood_type", "type": "string", "required": false }
+      ],
+      "required_fields": ["record_id"],
+      "icon": "record",
+      "color": "#E74C3C"
+    },
+    {
+      "name": "VitalSign",
+      "description": "Vital sign reading",
+      "fields": [
+        { "name": "sign_type", "type": "string", "required": true },
+        { "name": "value", "type": "string", "required": true },
+        { "name": "unit", "type": "string", "required": false },
+        { "name": "measured_at", "type": "date", "required": false }
+      ],
+      "required_fields": ["sign_type", "value"],
+      "icon": "vital",
+      "color": "#C0392B"
+    },
+    {
+      "name": "Medication",
+      "description": "Medication usage record",
+      "fields": [
+        { "name": "drug_name", "type": "string", "required": true },
+        { "name": "dosage", "type": "string", "required": false },
+        { "name": "frequency", "type": "string", "required": false },
+        { "name": "prescribed_by", "type": "string", "required": false }
+      ],
+      "required_fields": ["drug_name"],
+      "icon": "pill",
+      "color": "#A93226"
+    }
+  ],
+  "relations": [
+    {
+      "name": "includes",
+      "source_type": "HealthRecord",
+      "target_type": "VitalSign",
+      "relation_type": "one_to_many",
+      "description": "A health record includes multiple vital readings"
+    }
+  ],
+  "taxonomy_tags": ["healthcare", "record", "vital", "medication", "wellness"],
+  "search_config": {
+    "boost_fields": ["record_id", "blood_type", "drug_name"],
+    "synonyms": {
+      "血压": ["blood pressure", "bp"],
+      "血糖": ["glucose", "blood sugar"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "blood_pressure": "\\d{2,3}/\\d{2,3}\\s*(?:mmHg)?",
+      "blood_glucose": "\\d+\\.?\\d*\\s*(?:mmol/L|mg/dL)",
+      "dosage": "\\d+\\.?\\d*\\s*(?:mg|g|ml|片|粒|支)"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "domain_id": "hr",
+  "domain_name": "HR Knowledge Base",
+  "version": "1.0.0",
+  "description": "Human resources domain for employees, hiring, and performance",
+  "entities": [
+    {
+      "name": "Employee",
+      "description": "Employee profile",
+      "fields": [
+        { "name": "employee_id", "type": "string", "required": true },
+        { "name": "department", "type": "string", "required": true },
+        { "name": "position", "type": "string", "required": false },
+        { "name": "join_date", "type": "date", "required": false }
+      ],
+      "required_fields": ["employee_id", "department"],
+      "icon": "user",
+      "color": "#2980B9"
+    },
+    {
+      "name": "JobPosting",
+      "description": "Open job posting",
+      "fields": [
+        { "name": "job_id", "type": "string", "required": true },
+        { "name": "requirements", "type": "list", "required": false },
+        { "name": "salary_range", "type": "string", "required": false },
+        { "name": "status", "type": "enum", "required": false, "enum_values": ["open", "closed", "draft"] }
+      ],
+      "required_fields": ["job_id"],
+      "icon": "job",
+      "color": "#1F618D"
+    },
+    {
+      "name": "PerformanceReview",
+      "description": "Performance review record",
+      "fields": [
+        { "name": "review_id", "type": "string", "required": true },
+        { "name": "period", "type": "string", "required": false },
+        { "name": "score", "type": "number", "required": false },
+        { "name": "goals", "type": "list", "required": false }
+      ],
+      "required_fields": ["review_id"],
+      "icon": "score",
+      "color": "#2E86C1"
+    }
+  ],
+  "relations": [
+    {
+      "name": "evaluates",
+      "source_type": "PerformanceReview",
+      "target_type": "Employee",
+      "relation_type": "one_to_one",
+      "description": "One review evaluates one employee"
+    }
+  ],
+  "taxonomy_tags": ["hr", "employee", "hiring", "performance", "salary"],
+  "search_config": {
+    "boost_fields": ["employee_id", "job_id", "review_id"],
+    "synonyms": {
+      "招聘": ["hiring", "recruitment"],
+      "绩效": ["performance", "review"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "employee_id": "(?:EMP|HR)\\d{4,6}",
+      "department": "(技术部|销售部|人事部|财务部|运营部)",
+      "salary_range": "\\d{2,3}K-\\d{2,3}K"
+    }
+  }
+}

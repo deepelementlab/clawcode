@@ -1,0 +1,59 @@
+{
+  "domain_id": "legal",
+  "domain_name": "Legal Knowledge Base",
+  "version": "1.0.0",
+  "description": "Legal knowledge domain for statutes, cases, and contracts",
+  "entities": [
+    {
+      "name": "LawArticle",
+      "description": "Statute article or regulation clause",
+      "fields": [
+        { "name": "article_number", "type": "string", "required": true },
+        { "name": "law_name", "type": "string", "required": true },
+        { "name": "effective_date", "type": "date", "required": false }
+      ],
+      "required_fields": ["article_number", "law_name"],
+      "icon": "balance",
+      "color": "#2C3E50"
+    },
+    {
+      "name": "Case",
+      "description": "Judicial case",
+      "fields": [
+        { "name": "case_number", "type": "string", "required": true },
+        { "name": "court", "type": "string", "required": false },
+        { "name": "judgment_date", "type": "date", "required": false }
+      ],
+      "required_fields": ["case_number"],
+      "icon": "gavel",
+      "color": "#34495E"
+    }
+  ],
+  "relations": [
+    {
+      "name": "applies_to",
+      "source_type": "LawArticle",
+      "target_type": "Case",
+      "relation_type": "one_to_many",
+      "description": "A law article can apply to many cases"
+    }
+  ],
+  "taxonomy_tags": ["law", "article", "case", "court", "contract", "regulation"],
+  "search_config": {
+    "boost_fields": ["article_number", "case_number"],
+    "synonyms": {
+      "判决": ["裁判", "裁决"],
+      "合同": ["契约", "agreement"]
+    },
+    "stop_words": ["的", "和", "与", "或"]
+  },
+  "ingest_config": {
+    "supported_formats": [".txt", ".md", ".pdf", ".csv"],
+    "auto_extract": true,
+    "extraction_patterns": {
+      "article_number": "第\\d+条",
+      "law_name": "《[^》]+》",
+      "case_number": "\\(\\d{4}\\).*?第\\d+号"
+    }
+  }
+}

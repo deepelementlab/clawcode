@@ -477,4 +477,38 @@ def experience_dashboard_command(cwd: Path | None, as_json: bool, no_alerts: boo
     click.echo(f"- buckets: {abx.get('buckets', {})}")
 
 
+@cli.group()
+def deepnote() -> None:
+    """DeepNote closed-loop learning commands."""
+    pass
+
+
+@deepnote.command("run-cycle")
+@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("--window-hours", type=int, default=168, show_default=True, help="Observation window in hours.")
+@click.option("--dry-run/--no-dry-run", default=True, show_default=True, help="Run without writing ECAP/evolved outputs.")
+@click.option("--apply", is_flag=True, help="Alias of --no-dry-run for convenience.")
+@click.option("--json", "as_json", is_flag=True, help="Output JSON payload.")
+def deepnote_run_cycle(cwd: Path | None, window_hours: int, dry_run: bool, apply: bool, as_json: bool) -> None:
+    """Run one DeepNote learning cycle via the main CLI."""
+    wd = str(cwd) if cwd else None
+    settings = asyncio.run(load_settings(working_directory=wd or None, debug=False))
+
+    from ..deepnote.learning_service import DeepNoteLearningService
+
+    svc = DeepNoteLearningService(settings=settings)
+    effective_dry_run = False if apply else bool(dry_run)
+    result = svc.run_learning_cycle(window_hours=max(1, int(window_hours)), dry_run=effective_dry_run)
+    if as_json:
+        click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    click.echo("# DeepNote Learning Cycle")
+    click.echo(f"- dry_run: {result.get('dry_run')}")
+    click.echo(f"- observations_count: {result.get('observations_count', 0)}")
+    click.echo(f"- patterns_detected: {result.get('patterns_detected', 0)}")
+    click.echo(f"- ecaps_generated: {result.get('ecaps_generated', 0)}")
+    click.echo(f"- evolved_items: {result.get('evolved_items', 0)}")
+
+
 register_saddle_cli(cli)

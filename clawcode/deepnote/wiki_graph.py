@@ -3,6 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import structlog
+
+from .utils import atomic_write_text
+
+log = structlog.get_logger(__name__)
+
 
 class WikiGraph:
     """Persistent page link graph for DeepNote."""
@@ -27,14 +33,13 @@ class WikiGraph:
                 }
             else:
                 self._edges = {}
-        except Exception:
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+            log.warning("wiki_graph_load_failed", path=str(self.graph_path), error=str(exc))
             self._edges = {}
 
     def save(self) -> None:
-        self.graph_path.write_text(
-            json.dumps(self._edges, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        payload = json.dumps(self._edges, ensure_ascii=False, indent=2)
+        atomic_write_text(self.graph_path, payload)
 
     def update_links(self, page: str, links: list[str]) -> None:
         self._edges[page] = sorted({x for x in links if x and x != page})
@@ -52,4 +57,3 @@ class WikiGraph:
 
     def orphan_pages(self, all_pages: list[str]) -> list[str]:
         return sorted([p for p in all_pages if len(self.inbound(p)) == 0])
-
