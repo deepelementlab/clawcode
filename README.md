@@ -73,6 +73,10 @@ ClawCode features **ECAP** (Experience Capsule) and **TECAP** (Team Experience C
 - Automatic write-back from `/clawteam --deep_loop`
 - Portable, feedback-scored, privacy-controlled capsules
 
+### 🎨 Design Team (`/designteam`)
+
+Spin up specialist design agents (research, IXD, UI, product, visual) and ship structured design specs — not just "chatty UI suggestions."
+
 ### 👥 Virtual R&D Team (`/clawteam`)
 
 Orchestrate 14 professional roles in one command:
@@ -100,9 +104,6 @@ Orchestrate 14 professional roles in one command:
 | Agent | Subagent spawning with isolation |
 | Integration | MCP, Sourcegraph, Desktop automation |
 
-### 🎨 Design Team (`/designteam`)
-
-Spin up specialist design agents (research, IXD, UI, product, visual) and ship structured design specs — not just "chatty UI suggestions."
 
 ### 🔄 Claude Code Compatible
 
