@@ -131,6 +131,7 @@
       "disabled": false,
       "timeout": 120,
       "models": [
+        "deepseek-v4-pro",
         "deepseek-chat",
         "deepseek-reasoner"
       ]
