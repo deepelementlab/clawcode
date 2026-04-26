@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import hashlib
+import re
 import time
 from collections import defaultdict
 import uuid
@@ -225,6 +226,27 @@ _TOOL_OUTPUT_MAX_CHARS = 8000
 _ARTIFACT_PREVIEW_CHARS = 200
 _logger = logging.getLogger(__name__)
 
+# Regexes to strip tool-call-like JSON that leaks into the LLM content stream.
+_LEAKED_TOOL_JSON_RE = re.compile(
+    r"(TodoWrite|TaskCreate|TaskUpdate|UpdateProjectState)\s*[\[{].*?[}\]]",
+    re.DOTALL,
+)
+_LEAKED_TOOL_LINE_RE = re.compile(
+    r">\s*(bash|ls|write|edit|view|grep|glob|patch|fetch|mcp_call)\s+\{.*?\}",
+    re.DOTALL,
+)
+
+
+def _strip_leaked_tool_json(text: str) -> str:
+    """Remove tool-call-like JSON/repr that leaks into content stream."""
+    if not text:
+        return text
+    text = _LEAKED_TOOL_JSON_RE.sub("", text)
+    text = _LEAKED_TOOL_LINE_RE.sub("", text)
+    # Collapse excessive blank lines left behind
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text
+
 
 def _normalize_tool_message_sequences_for_api(
     messages: list[dict[str, Any]],
@@ -428,6 +450,9 @@ class Agent:
         self._tools = {t.info().name: t for t in self._tools_unique}
         if "Agent" in self._tools:
             self._tools["Task"] = self._tools["Agent"]
+        # Alias mapping for common LLM-trained tool names that differ from our naming
+        if "batch_view" in self._tools:
+            self._tools["read_important_files_batch"] = self._tools["batch_view"]
         self._message_service = message_service
         self._session_service = session_service
         self._system_prompt = system_prompt or get_system_prompt("coder")
@@ -478,6 +503,8 @@ class Agent:
         _max_sub = int(getattr(settings, "max_concurrent_subagents", 3)) if settings else 3
         self._tool_semaphore = asyncio.Semaphore(max(1, _max_tools))
         self._subagent_semaphore = asyncio.Semaphore(max(1, _max_sub))
+        # Read-only tool result cache to avoid redundant calls within a single Agent run
+        self._tool_result_cache: dict[str, ToolResponse] = {}
 
     def _reset_closed_loop_metrics(self) -> None:
         """Per-run observability counters for closed-loop behavior."""
@@ -837,6 +864,7 @@ class Agent:
 
                             case ProviderEventType.CONTENT_DELTA:
                                 delta = event.content or ""
+                                delta = _strip_leaked_tool_json(delta)
                                 assistant_msg.parts.append(TextContent(content=delta))
                                 yield AgentEvent.content_delta(delta)
                                 now = time.monotonic()
@@ -1200,7 +1228,18 @@ class Agent:
             return
 
         from .tools import ToolContext
-        TOOL_TIMEOUT = 120  # per-tool hard timeout (seconds)
+        _base_tool_timeout = 120
+        if self._settings is not None:
+            _base_tool_timeout = int(getattr(self._settings, "tool_timeout_seconds", 120))
+        TOOL_TIMEOUT = _base_tool_timeout  # per-tool hard timeout (seconds)
+
+        # Dynamic timeout for write tool based on content size
+        if tool_name == "write":
+            _write_params = tool_call.get_input_dict()
+            _content_len = len(_write_params.get("content", ""))
+            # Add 30s per 100KB to avoid large-file timeouts
+            TOOL_TIMEOUT += (_content_len // 100_000) * 30
+
         context = ToolContext(
             session_id=session_id,
             message_id="",
@@ -1223,8 +1262,15 @@ class Agent:
                     yield AgentEvent.tool_result(tool_name, tool_call.id, _err, True, True)
                     return
 
+            # Use _coerce_tool_params for robust parameter extraction before validation
+            from .tools.advanced import _coerce_tool_params
+            _coerced_params = _coerce_tool_params(tool_call)
+            if not _coerced_params:
+                # Fallback to get_input_dict if _coerce_tool_params returns empty
+                _coerced_params = tool_call.get_input_dict()
+
             _pilot_err = pilot_validate_tool_input(
-                tool_name, tool_call.get_input_dict()
+                tool_name, _coerced_params
             )
             if _pilot_err:
                 results_fragment.append(
@@ -1258,6 +1304,21 @@ class Agent:
                     _err = f"Permission denied by hook: {_reason}"
                     results_fragment.append(_persisted_tool_result_dict(tool_call, _err, True))
                     yield AgentEvent.tool_result(tool_name, tool_call.id, _err, True, True)
+                    return
+
+            # Read-only tool cache: avoid redundant calls within a single Agent run
+            if tool_name in self._READ_ONLY_TOOLS:
+                _cache_key = f"{tool_name}:{json.dumps(tool_call.get_input_dict(), sort_keys=True, ensure_ascii=False)}"
+                _cached = self._tool_result_cache.get(_cache_key)
+                if _cached is not None:
+                    _clean_resp = sanitize_text(_cached.content or "")
+                    _clean_resp = self._maybe_save_artifact(session_id, tool_call.id, _clean_resp)
+                    results_fragment.append(
+                        _persisted_tool_result_dict(tool_call, _clean_resp, _cached.is_error)
+                    )
+                    yield AgentEvent.tool_result(
+                        tool_name, tool_call.id, _clean_resp, _cached.is_error, True
+                    )
                     return
 
             # Learning observations: lightweight local telemetry for /learn.
@@ -1499,6 +1560,9 @@ class Agent:
                     response.is_error,
                     True,
                 )
+                # Cache successful read-only tool results
+                if tool_name in self._READ_ONLY_TOOLS and not response.is_error:
+                    self._tool_result_cache[_cache_key] = response
                 # --- Hook: PostToolUse / PostToolUseFailure (non-streaming) ---
                 if self._hook_engine:
                     _post_event = (
@@ -1682,6 +1746,7 @@ class Agent:
         except Exception:
             inject_reasoning = False
 
+        old_provider_rows = len(cache)
         new_msgs = history[cache_len:]
         for msg in new_msgs:
             converted = self._convert_single_message(msg, inject_reasoning, cache=cache)
@@ -1696,14 +1761,19 @@ class Agent:
                 self._provider_messages_cache_len = len(history)
 
         result = list(cache)
-        # Always normalize the full list. Incremental `start_from` was unsafe:
-        # `cache_len_before` counts *provider rows* (one TOOL Message can become many
-        # rows), so `start_from = cache_len_before - 1` could split *between* tool
-        # rows that belong to the same assistant — then `tail` starts with `tool`
-        # and the loop treats them as orphans → OpenAI 400:
-        # "Messages with role 'tool' must be a response to ... 'tool_calls'".
-        self._metric_provider_normalize_full_fallbacks += 1
-        _normalize_tool_message_sequences_for_api(result, start_from=0)
+        # Incremental normalize: find the last assistant with tool_calls in the
+        # *old* part of the cache.  Only new messages (and the boundary assistant)
+        # need rescanning — everything before that point was already correct.
+        if new_count > 0 and old_provider_rows > 1:
+            normalize_start = 0
+            for idx in range(old_provider_rows - 1, -1, -1):
+                if result[idx].get("role") == "assistant" and result[idx].get("tool_calls"):
+                    normalize_start = idx
+                    break
+            _normalize_tool_message_sequences_for_api(result, start_from=normalize_start)
+        else:
+            self._metric_provider_normalize_full_fallbacks += 1
+            _normalize_tool_message_sequences_for_api(result, start_from=0)
         return result
 
     def _convert_single_message(

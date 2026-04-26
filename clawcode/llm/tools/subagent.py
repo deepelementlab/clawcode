@@ -215,7 +215,6 @@ CODER_TOOLS = {
     "write",
     "edit",
     "execute_code",
-    "cronjob",
 }
 PLAN_TOOLS = set(READ_ONLY_TOOLS)
 TEST_TOOLS = set(READ_ONLY_TOOLS)

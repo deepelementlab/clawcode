@@ -45,6 +45,34 @@ def _json_dump(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _format_execute_code_result(result: dict[str, Any]) -> str:
+    """Convert structured execute_code result into human-readable text for TUI."""
+    kind = result.get("kind", "")
+    if kind == "shell":
+        stdout = result.get("stdout", "")
+        stderr = result.get("stderr", "")
+        rc = result.get("returncode", -1)
+        lines: list[str] = []
+        if stdout:
+            lines.append(stdout)
+        if stderr:
+            lines.append(f"[stderr] {stderr}")
+        if rc != 0:
+            lines.append(f"(exit {rc})")
+        return "\n".join(lines) if lines else "(no output)"
+    if kind == "python":
+        stdout = result.get("stdout", "")
+        stderr = result.get("stderr", "")
+        lines = []
+        if stdout:
+            lines.append(stdout)
+        if stderr:
+            lines.append(f"[stderr] {stderr}")
+        return "\n".join(lines) if lines else "(no output)"
+    # Fallback for unknown kinds
+    return _json_dump(result)
+
+
 def _coerce_timeout_s(raw: Any, default: float = 60.0) -> float:
     try:
         v = float(raw)
@@ -548,7 +576,7 @@ safe_builtins = {
     "zip": zip,
 }
 
-def _rpc_call(tool_name, args):
+def _rpc_call(tool_name, args, *, rpc_timeout=30):
     if not RPC_PORT or not RPC_TOKEN:
         return {"success": False, "error": "RPC not configured"}
     payload = {
@@ -557,7 +585,7 @@ def _rpc_call(tool_name, args):
         "tool": tool_name,
         "args": args or {},
     }
-    s = socket.create_connection((RPC_HOST, RPC_PORT), timeout=30)
+    s = socket.create_connection((RPC_HOST, RPC_PORT), timeout=rpc_timeout)
     try:
         s.sendall((json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"))
         f = s.makefile("r", encoding="utf-8", newline="\n")
@@ -575,10 +603,12 @@ def _rpc_call(tool_name, args):
             pass
 
 def bash(command, timeout=None, workdir=None):
-    return _rpc_call("bash", {"command": command, "timeout": timeout, "workdir": workdir})
+    rpc_timeout = min(120, (timeout or 60) + 10)
+    return _rpc_call("bash", {"command": command, "timeout": timeout, "workdir": workdir}, rpc_timeout=rpc_timeout)
 
 def terminal(command, timeout=None, workdir=None):
-    return _rpc_call("terminal", {"command": command, "timeout": timeout, "workdir": workdir})
+    rpc_timeout = min(120, (timeout or 60) + 10)
+    return _rpc_call("terminal", {"command": command, "timeout": timeout, "workdir": workdir}, rpc_timeout=rpc_timeout)
 
 def read_file(path, offset=1, limit=500):
     return _rpc_call("read_file", {"path": path, "offset": offset, "limit": limit})
@@ -881,9 +911,17 @@ class ExecuteCodeTool(BaseTool):
                 "stderr": "",
                 "returncode": 1,
             }
-            return ToolResponse(content=_json_dump(payload), is_error=True)
+            return ToolResponse(
+                content=_format_execute_code_result(payload),
+                metadata=_json_dump(payload),
+                is_error=True,
+            )
 
-        return ToolResponse(content=_json_dump(result), is_error=not bool(result.get("success")))
+        return ToolResponse(
+            content=_format_execute_code_result(result),
+            metadata=_json_dump(result),
+            is_error=not bool(result.get("success")),
+        )
 
 
 def create_execute_code_tool(permissions: Any = None) -> ExecuteCodeTool:

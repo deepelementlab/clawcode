@@ -18,6 +18,17 @@ from ..app import create_app
 from ..config.constants import ModelProvider
 from ..config.settings import load_settings
 from ..db import close_database, init_database
+
+
+class _CwdPath(click.Path):
+    def convert(self, value, param, ctx):
+        if isinstance(value, str):
+            value = value.rstrip('"').rstrip("'")
+        return super().convert(value, param, ctx)
+
+
+CWD_PATH = _CwdPath(exists=True, file_okay=False, path_type=Path)
+
 from .saddle_commands import register_saddle_cli
 
 
@@ -39,7 +50,7 @@ from .saddle_commands import register_saddle_cli
 @click.option(
     "-c",
     "--cwd",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    type=CWD_PATH,
     help="Set current working directory.",
 )
 @click.option(
@@ -266,7 +277,7 @@ def plugin_marketplace() -> None:
 
 @plugin_marketplace.command("add")
 @click.argument("source")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_marketplace_add(source: str, cwd: Path | None) -> None:
     """Add a marketplace (local path, git URL, or marketplace.json URL)."""
     settings, pm = _plugin_settings_pm(cwd)
@@ -282,7 +293,7 @@ def plugin_marketplace_add(source: str, cwd: Path | None) -> None:
 
 @plugin_marketplace.command("update")
 @click.argument("name", required=False)
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_marketplace_update(name: str | None, cwd: Path | None) -> None:
     """Update all marketplaces, or one by name."""
     settings, pm = _plugin_settings_pm(cwd)
@@ -294,7 +305,7 @@ def plugin_marketplace_update(name: str | None, cwd: Path | None) -> None:
 
 
 @plugin_marketplace.command("list")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_marketplace_list(cwd: Path | None) -> None:
     """List registered marketplaces."""
     settings, _pm = _plugin_settings_pm(cwd)
@@ -310,7 +321,7 @@ def plugin_marketplace_list(cwd: Path | None) -> None:
 
 @plugin_marketplace.command("remove")
 @click.argument("name")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_marketplace_remove(name: str, cwd: Path | None) -> None:
     """Remove a registered marketplace."""
     settings, pm = _plugin_settings_pm(cwd)
@@ -325,7 +336,7 @@ def plugin_marketplace_remove(name: str, cwd: Path | None) -> None:
 
 
 @plugin.command("list")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_list(cwd: Path | None) -> None:
     """List loaded plugins."""
     settings, pm = _plugin_settings_pm(cwd)
@@ -346,7 +357,7 @@ def plugin_list(cwd: Path | None) -> None:
 
 @plugin.command("install")
 @click.argument("spec")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_install(spec: str, cwd: Path | None) -> None:
     """Install plugin: ``name@marketplace`` or a local directory path."""
     settings, pm = _plugin_settings_pm(cwd)
@@ -375,7 +386,7 @@ def plugin_install(spec: str, cwd: Path | None) -> None:
 
 @plugin.command("uninstall")
 @click.argument("name")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_uninstall(name: str, cwd: Path | None) -> None:
     """Uninstall a plugin from the registry and cache."""
     _settings, pm = _plugin_settings_pm(cwd)
@@ -387,7 +398,7 @@ def plugin_uninstall(name: str, cwd: Path | None) -> None:
 
 @plugin.command("enable")
 @click.argument("name")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_enable(name: str, cwd: Path | None) -> None:
     """Enable a disabled plugin."""
     _settings, pm = _plugin_settings_pm(cwd)
@@ -399,7 +410,7 @@ def plugin_enable(name: str, cwd: Path | None) -> None:
 
 @plugin.command("disable")
 @click.argument("name")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_disable(name: str, cwd: Path | None) -> None:
     """Disable a plugin."""
     _settings, pm = _plugin_settings_pm(cwd)
@@ -410,7 +421,7 @@ def plugin_disable(name: str, cwd: Path | None) -> None:
 
 
 @cli.command("experience-dashboard")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
 @click.option("--no-alerts", is_flag=True, help="Skip alert evaluation and return metrics only.")
 @click.option("--domain", type=str, default=None, help="Optional problem domain filter.")
@@ -484,7 +495,7 @@ def deepnote() -> None:
 
 
 @deepnote.command("run-cycle")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 @click.option("--window-hours", type=int, default=168, show_default=True, help="Observation window in hours.")
 @click.option("--dry-run/--no-dry-run", default=True, show_default=True, help="Run without writing ECAP/evolved outputs.")
 @click.option("--apply", is_flag=True, help="Alias of --no-dry-run for convenience.")

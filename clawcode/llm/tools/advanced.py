@@ -42,6 +42,23 @@ def _coerce_tool_params(call: ToolCall) -> dict[str, Any]:
     (single quotes, Python dict literals, etc.). This parser keeps write/edit
     tools resilient and avoids false 'No file path provided' failures.
     """
+    def _normalize_aliases(params: dict[str, Any]) -> dict[str, Any]:
+        """Map common aliases to canonical keys."""
+        if "file_path" not in params:
+            for src in ("filePath", "path", "filename"):
+                if src in params and params[src] not in (None, ""):
+                    params["file_path"] = params[src]
+                    break
+        if "command" not in params:
+            for src in ("cmd", "shell", "code"):
+                if src in params and params[src] not in (None, ""):
+                    params["command"] = params[src]
+                    break
+        if "content" not in params:
+            if "text" in params and params["text"] not in (None, ""):
+                params["content"] = params["text"]
+        return params
+
     if isinstance(call.input, dict):
         direct = dict(call.input)
         for wrapper_key in ("arguments", "input", "params"):
@@ -51,16 +68,16 @@ def _coerce_tool_params(call: ToolCall) -> dict[str, Any]:
                 for k, v in direct.items():
                     if k not in ("arguments", "input", "params") and k not in merged:
                         merged[k] = v
-                return merged
+                return _normalize_aliases(merged)
             if isinstance(wrapped, str):
                 nested = _coerce_tool_params(ToolCall(id=call.id, name=call.name, input=wrapped))
                 if nested:
                     for k, v in direct.items():
                         if k not in ("arguments", "input", "params") and k not in nested:
                             nested[k] = v
-                    return nested
+                    return _normalize_aliases(nested)
         if _get_param(direct, "file_path", "filePath", "path", "filename"):
-            return direct
+            return _normalize_aliases(direct)
         for v in direct.values():
             if not isinstance(v, str) or not v.strip():
                 continue
@@ -72,8 +89,8 @@ def _coerce_tool_params(call: ToolCall) -> dict[str, Any]:
                 for nk, nv in nested.items():
                     if nk not in merged or merged[nk] in (None, ""):
                         merged[nk] = nv
-                return merged
-        return direct
+                return _normalize_aliases(merged)
+        return _normalize_aliases(direct)
 
     raw = str(call.input or "").strip()
     raw = _LEADING_RAW_EMPTY_JSON.sub("", raw).strip()
@@ -83,14 +100,14 @@ def _coerce_tool_params(call: ToolCall) -> dict[str, Any]:
     try:
         parsed = json.loads(raw)
         if isinstance(parsed, dict):
-            return parsed
+            return _normalize_aliases(parsed)
     except Exception:
         pass
 
     try:
         parsed = ast.literal_eval(raw)
         if isinstance(parsed, dict):
-            return parsed
+            return _normalize_aliases(parsed)
     except Exception:
         pass
 
@@ -102,32 +119,37 @@ def _coerce_tool_params(call: ToolCall) -> dict[str, Any]:
     if jm:
         return {"file_path": jm.group(1)}
 
-    # Stream concat / proxy quirks: e.g. ``{}{"file_path": "README.md"}`` — take last non-empty object.
-    extracted: list[dict[str, Any]] = []
-    start = raw.find("{")
-    while start != -1:
-        depth = 0
-        for i in range(start, len(raw)):
-            if raw[i] == "{":
-                depth += 1
-            elif raw[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    chunk = raw[start : i + 1]
-                    try:
-                        obj = json.loads(chunk)
-                        if isinstance(obj, dict):
-                            extracted.append(obj)
-                    except json.JSONDecodeError:
-                        pass
-                    break
-        start = raw.find("{", start + 1)
-    for d in reversed(extracted):
-        if d and _get_param(d, "file_path", "filePath", "path", "filename"):
-            return d
-    for d in reversed(extracted):
-        if d:
-            return d
+    # Skip expensive brace-matching for very large strings (>20KB) to avoid
+    # O(n²) behaviour when content contains many braces (e.g. markdown code).
+    _BRACE_MATCH_LIMIT = 20_000
+    if len(raw) <= _BRACE_MATCH_LIMIT:
+        # Stream concat / proxy quirks:
+        # e.g. ``{}{"file_path": "README.md"}`` — take last non-empty object.
+        extracted: list[dict[str, Any]] = []
+        start = raw.find("{")
+        while start != -1:
+            depth = 0
+            for i in range(start, len(raw)):
+                if raw[i] == "{":
+                    depth += 1
+                elif raw[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        chunk = raw[start : i + 1]
+                        try:
+                            obj = json.loads(chunk)
+                            if isinstance(obj, dict):
+                                extracted.append(obj)
+                        except json.JSONDecodeError:
+                            pass
+                        break
+            start = raw.find("{", start + 1)
+        for d in reversed(extracted):
+            if d and _get_param(d, "file_path", "filePath", "path", "filename"):
+                return _normalize_aliases(d)
+        for d in reversed(extracted):
+            if d:
+                return _normalize_aliases(d)
 
     # Last-resort extraction for malformed pseudo-JSON payloads.
     out: dict[str, Any] = {"raw": raw}
@@ -318,7 +340,11 @@ class WriteTool(BaseTool):
         """
         return ToolInfo(
             name="write",
-            description="Write content to a file. Creates the file if it doesn't exist, overwrites if it does.",
+            description=(
+                "Write content to a file. Creates the file if it doesn't exist, "
+                "overwrites if it does. For very large files (>50KB), use multiple "
+                "calls with append=true to write in chunks."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
@@ -332,7 +358,17 @@ class WriteTool(BaseTool):
                     },
                     "create_dirs": {
                         "type": "boolean",
-                        "description": "Create parent directories if they don't exist (default: true).",
+                        "description": (
+                            "Create parent directories if they don't exist "
+                            "(default: true)."
+                        ),
+                    },
+                    "append": {
+                        "type": "boolean",
+                        "description": (
+                            "If true, append content to the end of the file "
+                            "instead of overwriting (default: false)."
+                        ),
                     },
                 },
                 "required": ["file_path", "content"],
@@ -358,6 +394,7 @@ class WriteTool(BaseTool):
         file_path = _get_param(params, "file_path", "filePath", "path", "filename")
         content = _get_param(params, "content", "text", default="")
         create_dirs = params.get("create_dirs", True)
+        append = params.get("append", False)
 
         if not file_path:
             return ToolResponse(
@@ -391,40 +428,50 @@ class WriteTool(BaseTool):
 
         try:
             _DIFF_SIZE_LIMIT = 100_000
+            _DIFF_SKIP_THRESHOLD = 50_000
 
-            def _write_sync() -> tuple[int, int, str, bool]:
+            def _write_sync() -> tuple[int, int, str, bool, int]:
                 if create_dirs and path.parent != Path("."):
                     path.parent.mkdir(parents=True, exist_ok=True)
 
                 before = ""
                 sz = 0
+                existed = False
                 try:
                     st = path.stat()
                     sz = st.st_size
-                    if sz < _DIFF_SIZE_LIMIT:
+                    if sz < _DIFF_SIZE_LIMIT and not append:
                         with open(path, "r", encoding="utf-8") as f:
                             before = f.read()
                     existed = True
                 except FileNotFoundError:
                     existed = False
 
-                with open(path, "w", encoding="utf-8", newline="\n") as f:
+                mode = "a" if append else "w"
+                with open(path, mode, encoding="utf-8", newline="\n") as f:
                     f.write(content)
 
                 size = len(content.encode("utf-8"))
                 lines = content.count("\n") + 1
-                return lines, size, before, existed
+                total_size = path.stat().st_size
+                return lines, size, before, existed, total_size
 
-            lines, size, before, existed = await asyncio.to_thread(_write_sync)
+            lines, size, before, existed, total_size = await asyncio.to_thread(_write_sync)
             diff_text = ""
-            if existed and before != content:
-                diff_text, _ = _make_unified_diff(before, content, file_path)
+            if existed and not append and before != content:
+                # Skip expensive diff for very large before/after content
+                if len(before) < _DIFF_SKIP_THRESHOLD and len(content) < _DIFF_SKIP_THRESHOLD:
+                    diff_text, _ = _make_unified_diff(before, content, file_path)
+                else:
+                    diff_text = "... (diff omitted for large file)"
+            action = "appended" if append else "wrote"
             return ToolResponse(
                 content=(
-                    f"Successfully wrote {lines} lines ({size} bytes) to {file_path}"
+                    f"Successfully {action} {lines} lines ({size} bytes) to {file_path}"
+                    f" (total file size: {total_size} bytes)"
                     + (f"\n\n{diff_text}" if diff_text else "")
                 ),
-                metadata=f"{lines} lines, {size} bytes",
+                metadata=f"{lines} lines, {size} bytes, total {total_size} bytes",
             )
         except Exception as e:
             return ToolResponse(content=f"Error writing file: {e}", is_error=True)

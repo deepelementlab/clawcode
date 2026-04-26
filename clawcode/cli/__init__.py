@@ -17,7 +17,7 @@ from ..app import create_app
 from ..config.constants import ModelProvider
 from ..db import close_database, init_database
 
-from .commands import run_non_interactive
+from .commands import CWD_PATH, run_non_interactive
 
 
 @click.group(invoke_without_command=True)
@@ -38,7 +38,7 @@ from .commands import run_non_interactive
 @click.option(
     "-c",
     "--cwd",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    type=CWD_PATH,
     help="Set current working directory.",
 )
 @click.option(
@@ -175,7 +175,7 @@ def plugin() -> None:
 
 
 @plugin.command("list")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_list(cwd: Path | None) -> None:
     """List installed plugins."""
     launch_cwd = str(Path.cwd().resolve())
@@ -201,8 +201,8 @@ def plugin_list(cwd: Path | None) -> None:
 
 
 @plugin.command("install")
-@click.argument("path", type=click.Path(exists=True, file_okay=False, path_type=Path))
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.argument("path", type=CWD_PATH)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_install(path: Path, cwd: Path | None) -> None:
     """Install a plugin from a local directory."""
     launch_cwd = str(Path.cwd().resolve())
@@ -223,7 +223,7 @@ def plugin_install(path: Path, cwd: Path | None) -> None:
 
 @plugin.command("enable")
 @click.argument("name")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_enable(name: str, cwd: Path | None) -> None:
     """Enable a disabled plugin."""
     launch_cwd = str(Path.cwd().resolve())
@@ -243,7 +243,7 @@ def plugin_enable(name: str, cwd: Path | None) -> None:
 
 @plugin.command("disable")
 @click.argument("name")
-@click.option("-c", "--cwd", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None)
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
 def plugin_disable(name: str, cwd: Path | None) -> None:
     """Disable a plugin."""
     launch_cwd = str(Path.cwd().resolve())

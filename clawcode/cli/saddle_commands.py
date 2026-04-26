@@ -12,6 +12,8 @@ from pathlib import Path
 
 import click
 
+from .commands import CWD_PATH
+
 _SADDLE_MISSING = (
     "The 'saddle' extra is not installed. From the clawcode directory run:\n"
     '  pip install -e ".[saddle]"'
@@ -48,7 +50,7 @@ def register_saddle_cli(cli: click.Group) -> None:
     @click.option(
         "-c",
         "--cwd",
-        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        type=CWD_PATH,
         default=None,
         help="Project root (default: current working directory).",
     )
@@ -84,7 +86,7 @@ def register_saddle_cli(cli: click.Group) -> None:
     @click.option(
         "-c",
         "--cwd",
-        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        type=CWD_PATH,
         default=None,
         help="Project root (default cwd).",
     )
@@ -108,7 +110,7 @@ def register_saddle_cli(cli: click.Group) -> None:
     @click.option(
         "-c",
         "--cwd",
-        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        type=CWD_PATH,
         default=None,
         help="Project root (default cwd).",
     )
@@ -134,7 +136,7 @@ def register_saddle_cli(cli: click.Group) -> None:
     @click.option(
         "-c",
         "--cwd",
-        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        type=CWD_PATH,
         default=None,
         help="Project root (default cwd).",
     )
