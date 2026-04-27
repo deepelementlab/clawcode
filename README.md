@@ -29,7 +29,8 @@
   <a href="#quick-start">Quick Start</a> •
   <a href="#why-clawcode">Why ClawCode</a> •
   <a href="#features">Features</a> •
-  <a href="#docs">Documentation</a> •
+  <a href="#research-mode">Research</a> •
+  <a href="#documentation">Documentation</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -94,6 +95,24 @@ Orchestrate 14 professional roles in one command:
 /clawteam --deep_loop "Design microservice arch" # Convergent iteration
 ```
 
+### 🔬 Research Mode (`clawcode research`)
+
+Multi-phase investigation workflows with tool-backed evidence collection:
+
+| Workflow | Purpose |
+|----------|---------|
+| `deepresearch` | Template-driven: plan → research → verify → deliver |
+| `peerreview` | Critical review with verification |
+| `lit` | Literature survey |
+| `audit` | Inspect URL/repo/artifact |
+
+**Research tools:** `research_web_search` (Firecrawl/Tavily/Parallel), `research_paper_search` (arXiv/Semantic Scholar), `research_fetch_url`, `research_sandbox_exec`, `research_code_audit`.
+
+```bash
+clawcode research start "Quantum error correction" --workflow deepresearch -o ./outputs/qec
+clawcode research list-prompts  # View available templates
+```
+
 ### 🔧 44 Built-in Tools
 
 | Category | Examples |
@@ -103,6 +122,7 @@ Orchestrate 14 professional roles in one command:
 | Browser | `browser_*` (×11 automation tools) |
 | Agent | Subagent spawning with isolation |
 | Integration | MCP, Sourcegraph, Desktop automation |
+| Research | `research_*` (web, papers, audit) |
 
 
 ### 🔄 Claude Code Compatible
@@ -111,15 +131,49 @@ Migration-friendly: supports `.claude/agents/`, Claude-style tool names, plugin/
 
 ## Quick Start
 
+### 1. Install
+
 ```bash
 cd clawcode
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1   # Windows
 pip install -e ".[dev]"
-clawcode -c "/path/to/project"
 ```
 
-**Requirements:** Python >=3.12, one LLM provider credential.
+**Requirements:** Python >=3.12
+
+### 2. Configure
+
+Create `.clawcode.json` in your project root:
+
+```json
+{
+  "providers": {
+    "openai": {
+      "api_key": "sk-...",
+      "disabled": false
+    }
+  },
+  "agents": {
+    "coder": {
+      "model": "gpt-4o",
+      "provider_key": "openai"
+    }
+  }
+}
+```
+
+Or use environment variables:
+```bash
+export CLAWCODE_OPENAI__API_KEY="sk-..."
+```
+
+### 3. Run
+
+```bash
+clawcode -c "/path/to/project"     # Interactive TUI
+clawcode -p "Refactor this API"    # Non-interactive
+```
 
 ## Documentation
 
@@ -131,6 +185,80 @@ clawcode -c "/path/to/project"
 | Slash Commands Reference | [docs/slash-commands.md](docs/slash-commands.md) |
 | Configuration Guide | [docs/clawcode-configuration.md](docs/clawcode-configuration.md) |
 | Performance & Testing | [docs/clawcode-performance.md](docs/clawcode-performance.md) |
+| Research Mode | [docs/research_mode.md](docs/research_mode.md) |
+
+---
+
+## Research Mode
+
+ClawCode includes an independent **research** subcommand for multi-phase investigation workflows with tool-backed evidence collection.
+
+### Workflows
+
+| Workflow | Command | Description |
+|----------|---------|-------------|
+| `deepresearch` | `clawcode research start "topic" -w deepresearch` | 4-phase template: plan → research → verify → deliver |
+| `peerreview` | `clawcode research start "topic" -w peerreview` | Critical review: review → verify → deliver |
+| `lit` | `clawcode research start "topic" -w lit` | Literature survey |
+| `audit` | `clawcode research audit <url>` | Inspect URL/repo/artifact |
+| `compare` | `clawcode research start "topic" -w compare` | Side-by-side comparison |
+
+### Research Tools
+
+- `research_web_search` — Web search with Firecrawl/Tavily/Parallel (DuckDuckGo fallback)
+- `research_paper_search` — arXiv + optional Semantic Scholar
+- `research_fetch_url` — Fetch and extract page content
+- `research_sandbox_exec` — Shell execution in sandbox
+- `research_code_audit` — Compare claims against repo code
+
+### Quick Examples
+
+```bash
+# Deep research with Markdown template phases
+clawcode research start "Quantum error correction" --workflow deepresearch -o ./outputs/qec
+
+# Peer review a proposal
+clawcode research start "Review: LLM scaling laws" --workflow peerreview -o ./outputs/review
+
+# Audit a repository
+clawcode research audit https://github.com/example/repo -o ./outputs/audit
+
+# List available templates
+clawcode research list-prompts
+
+# Validate config without calling LLM
+clawcode research start "Test" --dry-run
+```
+
+### Configuration
+
+Add to `.clawcode.json`:
+
+```json
+{
+  "web": {
+    "backend": "firecrawl",
+    "firecrawl_api_key": "YOUR_KEY",
+    "tavily_api_key": "YOUR_KEY",
+    "parallel_api_key": ""
+  },
+  "research": {
+    "enabled": true,
+    "s2_api_key": "YOUR_SEMANTIC_SCHOLAR_KEY",
+    "subagents": { "max_concurrent": 3 }
+  }
+}
+```
+
+**Optional API keys:**
+- [Firecrawl](https://firecrawl.dev) — Enhanced web search/extraction
+- [Tavily](https://tavily.com) — Research-optimized search
+- [Parallel](https://parallel.ai) — Alternative search backend
+- [Semantic Scholar](https://www.semanticscholar.org/product/api) — Higher rate limits for papers
+
+Without API keys, research falls back to DuckDuckGo (web) and arXiv (papers, no key required).
+
+---
 
 ## Test Results
 
