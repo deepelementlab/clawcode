@@ -70,6 +70,15 @@ def _load_web_config() -> dict:
         return {}
 
 
+def _web_secret(name: str, cfg_key: str) -> str:
+    """Read secret from env first, then from ``settings.web``."""
+    value = os.getenv(name)
+    if value:
+        return value
+    cfg = _load_web_config()
+    return str(cfg.get(cfg_key, "") or "").strip()
+
+
 def _get_backend() -> str:
     """Determine which web backend to use.
 
@@ -85,9 +94,9 @@ def _get_backend() -> str:
     if configured in ("parallel", "firecrawl", "tavily"):
         return configured
     # Fallback for manual / legacy config — use whichever key is present.
-    has_firecrawl = bool(os.getenv("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_URL"))
-    has_parallel = bool(os.getenv("PARALLEL_API_KEY"))
-    has_tavily = bool(os.getenv("TAVILY_API_KEY"))
+    has_firecrawl = bool(_web_secret("FIRECRAWL_API_KEY", "firecrawl_api_key") or _web_secret("FIRECRAWL_API_URL", "firecrawl_api_url"))
+    has_parallel = bool(_web_secret("PARALLEL_API_KEY", "parallel_api_key"))
+    has_tavily = bool(_web_secret("TAVILY_API_KEY", "tavily_api_key"))
     if has_tavily and not has_firecrawl and not has_parallel:
         return "tavily"
     if has_parallel and not has_firecrawl:
@@ -116,8 +125,8 @@ def _get_firecrawl_client():
                 "Install it with `pip install firecrawl-py` or configure a different "
                 "web backend (Parallel/Tavily)."
             )
-        api_key = os.getenv("FIRECRAWL_API_KEY")
-        api_url = os.getenv("FIRECRAWL_API_URL")
+        api_key = _web_secret("FIRECRAWL_API_KEY", "firecrawl_api_key")
+        api_url = _web_secret("FIRECRAWL_API_URL", "firecrawl_api_url")
         if not api_key and not api_url:
             raise ValueError(
                 "FIRECRAWL_API_KEY environment variable not set. "
@@ -146,7 +155,7 @@ def _get_parallel_client():
     from parallel import Parallel
     global _parallel_client
     if _parallel_client is None:
-        api_key = os.getenv("PARALLEL_API_KEY")
+        api_key = _web_secret("PARALLEL_API_KEY", "parallel_api_key")
         if not api_key:
             raise ValueError(
                 "PARALLEL_API_KEY environment variable not set. "
@@ -164,7 +173,7 @@ def _get_async_parallel_client():
     from parallel import AsyncParallel
     global _async_parallel_client
     if _async_parallel_client is None:
-        api_key = os.getenv("PARALLEL_API_KEY")
+        api_key = _web_secret("PARALLEL_API_KEY", "parallel_api_key")
         if not api_key:
             raise ValueError(
                 "PARALLEL_API_KEY environment variable not set. "
@@ -184,7 +193,7 @@ def _tavily_request(endpoint: str, payload: dict) -> dict:
     Auth is provided via ``api_key`` in the JSON body (no header-based auth).
     Raises ``ValueError`` if ``TAVILY_API_KEY`` is not set.
     """
-    api_key = os.getenv("TAVILY_API_KEY")
+    api_key = _web_secret("TAVILY_API_KEY", "tavily_api_key")
     if not api_key:
         raise ValueError(
             "TAVILY_API_KEY environment variable not set. "
@@ -1256,7 +1265,10 @@ async def web_crawl_tool(
             return cleaned_result
 
         # web_crawl requires Firecrawl — Parallel has no crawl API
-        if not (os.getenv("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_URL")):
+        if not (
+            _web_secret("FIRECRAWL_API_KEY", "firecrawl_api_key")
+            or _web_secret("FIRECRAWL_API_URL", "firecrawl_api_url")
+        ):
             return json.dumps({
                 "error": "web_crawl requires Firecrawl. Set FIRECRAWL_API_KEY, "
                          "or use web_search + web_extract instead.",
@@ -1531,16 +1543,16 @@ def check_firecrawl_api_key() -> bool:
     Returns:
         bool: True if API key is set, False otherwise
     """
-    return bool(os.getenv("FIRECRAWL_API_KEY"))
+    return bool(_web_secret("FIRECRAWL_API_KEY", "firecrawl_api_key"))
 
 
 def check_web_api_key() -> bool:
     """Check if any web backend API key is available (Parallel, Firecrawl, or Tavily)."""
     return bool(
-        os.getenv("PARALLEL_API_KEY")
-        or os.getenv("FIRECRAWL_API_KEY")
-        or os.getenv("FIRECRAWL_API_URL")
-        or os.getenv("TAVILY_API_KEY")
+        _web_secret("PARALLEL_API_KEY", "parallel_api_key")
+        or _web_secret("FIRECRAWL_API_KEY", "firecrawl_api_key")
+        or _web_secret("FIRECRAWL_API_URL", "firecrawl_api_url")
+        or _web_secret("TAVILY_API_KEY", "tavily_api_key")
     )
 
 

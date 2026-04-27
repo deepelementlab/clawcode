@@ -8,10 +8,22 @@ import xml.etree.ElementTree as ET
 from typing import Any
 
 import httpx
+from ...config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
 _ARXIV_ATOM = "{http://www.w3.org/2005/Atom}"
+
+
+def _s2_api_key() -> str:
+    """Prefer env var, fallback to ``settings.research.s2_api_key``."""
+    env_key = (os.getenv("S2_API_KEY") or "").strip()
+    if env_key:
+        return env_key
+    try:
+        return str(get_settings().research.s2_api_key or "").strip()
+    except Exception:
+        return ""
 
 
 async def _arxiv_search(query: str, max_results: int = 10) -> dict[str, Any]:
@@ -58,7 +70,7 @@ async def _semantic_scholar_search(query: str, limit: int = 10) -> dict[str, Any
     """Semantic Scholar search (optional ``S2_API_KEY`` for higher rate limits)."""
     base = "https://api.semanticscholar.org/graph/v1/paper/search"
     headers: dict[str, str] = {}
-    key = (os.getenv("S2_API_KEY") or "").strip()
+    key = _s2_api_key()
     if key:
         headers["x-api-key"] = key
 

@@ -195,6 +195,10 @@ class WebConfig(BaseModel):
     """Web tooling configuration (used by migrated browser/web tools)."""
 
     backend: Literal["firecrawl", "parallel", "tavily"] = "firecrawl"
+    firecrawl_api_key: str = ""
+    firecrawl_api_url: str = ""
+    tavily_api_key: str = ""
+    parallel_api_key: str = ""
 
 
 class BrowserConfig(BaseModel):

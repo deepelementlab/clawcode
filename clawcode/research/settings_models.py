@@ -58,6 +58,7 @@ class ResearchConfig(BaseModel):
     backend: Literal["native", "external"] = "native"
     external_adapter: str = ""
     default_model: str = ""
+    s2_api_key: str = ""
     workflows: dict[str, ResearchWorkflowRuntimeConfig] = Field(default_factory=dict)
     subagents: ResearchSubAgentConfig = Field(default_factory=ResearchSubAgentConfig)
     sandbox: ResearchSandboxConfig = Field(default_factory=ResearchSandboxConfig)
