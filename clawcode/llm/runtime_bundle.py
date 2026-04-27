@@ -136,7 +136,7 @@ def build_coder_runtime(
     plugin_manager: Any | None = None,
     lsp_manager: Any | None = None,
     for_claw_mode: bool | None = None,
-    style: Literal["tui_coder", "cli_non_interactive"] = "tui_coder",
+    style: Literal["tui_coder", "cli_non_interactive", "research_mode"] = "tui_coder",
 ) -> CoderRuntimeBundle:
     """Create provider, tools, and prompt according to ``style``.
 
@@ -148,7 +148,8 @@ def build_coder_runtime(
         plugin_manager: Optional plugin manager (hooks, skills text).
         lsp_manager: Optional LSP manager for diagnostics tool.
         for_claw_mode: Passed through to :func:`get_builtin_tools` (TUI desktop gating).
-        style: ``tui_coder`` builds full system prompt + summarizer + claw kwargs;
+        style: ``tui_coder`` / ``research_mode`` build full system prompt + summarizer + claw kwargs
+            (``research_mode`` is an alias for the same bundle as ``tui_coder``);
             ``cli_non_interactive`` builds minimal stack (default Agent system prompt).
     """
     agent_config = settings.get_agent_config("coder")
@@ -192,7 +193,7 @@ def build_coder_runtime(
             session_service=session_service,
         )
 
-    # --- tui_coder ---
+    # --- tui_coder / research_mode (same bundle; research merges extra tools in LeadResearchAgent) ---
     wd = (getattr(settings, "working_directory", None) or "").strip()
     ctx_parts: list[str] = []
     if plugin_manager is not None and getattr(plugin_manager, "context_content", None):

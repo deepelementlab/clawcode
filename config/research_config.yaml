@@ -1,0 +1,22 @@
+# Optional template: merge relevant keys into .clawcode.json under `research`.
+#
+# Example:
+# {
+#   "research": {
+#     "enabled": true,
+#     "backend": "native",
+#     "external_adapter": "",
+#     "default_model": "",
+#     "sandbox": { "type": "local", "docker_image": "clawcode-research-sandbox:latest", "work_dir": "" },
+#     "memory": { "enabled": true, "storage_subdir": "research_memory" },
+#     "subagents": { "max_concurrent": 3, "timeout_seconds": 300 },
+#     "workflows": {
+#       "deep": { "max_iterations": 10, "max_subagents": 5, "enable_verification": true }
+#     }
+#   }
+# }
+
+enabled: true
+backend: native
+external_adapter: ""
+default_model: ""

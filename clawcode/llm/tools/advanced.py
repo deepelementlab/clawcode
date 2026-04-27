@@ -322,27 +322,20 @@ def create_fetch_tool(permissions: Any = None) -> "FetchTool":
 
 
 class WriteTool(BaseTool):
-    """Tool for writing file contents."""
+    """Tool for writing file contents with atomic writes and resilience."""
+
+    _WRITE_RETRY_COUNT = 2
 
     def __init__(self, permissions: Any = None) -> None:
-        """Initialize the write tool.
-
-        Args:
-            permissions: Permission service for file writing
-        """
         self._permissions = permissions
 
     def info(self) -> ToolInfo:
-        """Get tool information.
-
-        Returns:
-            ToolInfo describing this tool
-        """
         return ToolInfo(
             name="write",
             description=(
                 "Write content to a file. Creates the file if it doesn't exist, "
-                "overwrites if it does. For very large files (>50KB), use multiple "
+                "overwrites if it does. Uses atomic writes (tmp+rename) to prevent "
+                "partial/corrupt files. For very large files (>50KB), use multiple "
                 "calls with append=true to write in chunks."
             ),
             parameters={
@@ -381,15 +374,6 @@ class WriteTool(BaseTool):
         call: ToolCall,
         context: ToolContext,
     ) -> ToolResponse:
-        """Write content to a file.
-
-        Args:
-            call: Tool call with file path and content
-            context: Tool execution context
-
-        Returns:
-            Tool response
-        """
         params = _coerce_tool_params(call)
         file_path = _get_param(params, "file_path", "filePath", "path", "filename")
         content = _get_param(params, "content", "text", default="")
@@ -397,17 +381,13 @@ class WriteTool(BaseTool):
         append = params.get("append", False)
 
         if not file_path:
-            return ToolResponse(
-                content="Error: No file path provided",
-                is_error=True,
-            )
+            return ToolResponse(content="Error: No file path provided", is_error=True)
 
         path = resolve_tool_path(file_path, context.working_directory)
         _outside = assert_resolved_path_in_workspace(path, context.working_directory)
         if _outside:
             return ToolResponse(content=_outside, is_error=True)
 
-        # Request permission
         if self._permissions:
             from ...core.permission import PermissionRequest
 
@@ -419,62 +399,113 @@ class WriteTool(BaseTool):
                 session_id=context.session_id,
             )
 
-            response = await self._permissions.request(request)
+            try:
+                response = await asyncio.wait_for(
+                    self._permissions.request(request),
+                    timeout=30.0,
+                )
+            except asyncio.TimeoutError:
+                return ToolResponse(
+                    content="Error: Permission request timed out (30s). Please approve permission prompt.",
+                    is_error=True,
+                )
             if not response.granted:
                 return ToolResponse(
                     content="Permission denied for file write",
                     is_error=True,
                 )
 
+        return await self._do_write(path, content, file_path, create_dirs, append)
+
+    async def _do_write(
+        self,
+        path: Path,
+        content: str,
+        display_path: str,
+        create_dirs: bool,
+        append: bool,
+    ) -> ToolResponse:
+        _DIFF_SIZE_LIMIT = 100_000
+        _DIFF_SKIP_THRESHOLD = 50_000
+
+        existed = False
+        before = ""
+        old_size = 0
+
         try:
-            _DIFF_SIZE_LIMIT = 100_000
-            _DIFF_SKIP_THRESHOLD = 50_000
+            st = path.stat()
+            old_size = st.st_size
+            existed = True
+        except FileNotFoundError:
+            existed = False
+        except OSError:
+            pass
 
-            def _write_sync() -> tuple[int, int, str, bool, int]:
-                if create_dirs and path.parent != Path("."):
-                    path.parent.mkdir(parents=True, exist_ok=True)
-
+        need_diff = existed and not append and old_size < _DIFF_SIZE_LIMIT
+        if need_diff:
+            try:
+                before = await asyncio.to_thread(path.read_text, encoding="utf-8")
+            except Exception:
                 before = ""
-                sz = 0
-                existed = False
+
+        try:
+            await self._atomic_write(path, content, create_dirs, append)
+        except OSError as e:
+            last_err = str(e)
+            for attempt in range(self._WRITE_RETRY_COUNT):
+                await asyncio.sleep(0.3 * (attempt + 1))
                 try:
-                    st = path.stat()
-                    sz = st.st_size
-                    if sz < _DIFF_SIZE_LIMIT and not append:
-                        with open(path, "r", encoding="utf-8") as f:
-                            before = f.read()
-                    existed = True
-                except FileNotFoundError:
-                    existed = False
+                    await self._atomic_write(path, content, create_dirs, append)
+                    break
+                except OSError as e2:
+                    last_err = str(e2)
+            else:
+                return ToolResponse(
+                    content=f"Error writing file after {self._WRITE_RETRY_COUNT + 1} attempts: {last_err}",
+                    is_error=True,
+                )
 
-                mode = "a" if append else "w"
-                with open(path, mode, encoding="utf-8", newline="\n") as f:
-                    f.write(content)
+        size = len(content.encode("utf-8"))
+        lines = content.count("\n") + 1
+        try:
+            total_size = path.stat().st_size
+        except OSError:
+            total_size = size
 
-                size = len(content.encode("utf-8"))
-                lines = content.count("\n") + 1
-                total_size = path.stat().st_size
-                return lines, size, before, existed, total_size
+        diff_text = ""
+        if need_diff and before != content:
+            if len(before) < _DIFF_SKIP_THRESHOLD and len(content) < _DIFF_SKIP_THRESHOLD:
+                diff_text, _ = _make_unified_diff(before, content, display_path)
+            else:
+                diff_text = "... (diff omitted for large file)"
 
-            lines, size, before, existed, total_size = await asyncio.to_thread(_write_sync)
-            diff_text = ""
-            if existed and not append and before != content:
-                # Skip expensive diff for very large before/after content
-                if len(before) < _DIFF_SKIP_THRESHOLD and len(content) < _DIFF_SKIP_THRESHOLD:
-                    diff_text, _ = _make_unified_diff(before, content, file_path)
-                else:
-                    diff_text = "... (diff omitted for large file)"
-            action = "appended" if append else "wrote"
-            return ToolResponse(
-                content=(
-                    f"Successfully {action} {lines} lines ({size} bytes) to {file_path}"
-                    f" (total file size: {total_size} bytes)"
-                    + (f"\n\n{diff_text}" if diff_text else "")
-                ),
-                metadata=f"{lines} lines, {size} bytes, total {total_size} bytes",
-            )
-        except Exception as e:
-            return ToolResponse(content=f"Error writing file: {e}", is_error=True)
+        action = "appended" if append else "wrote"
+        return ToolResponse(
+            content=(
+                f"Successfully {action} {lines} lines ({size} bytes) to {display_path}"
+                f" (total file size: {total_size} bytes)"
+                + (f"\n\n{diff_text}" if diff_text else "")
+            ),
+            metadata=f"{lines} lines, {size} bytes, total {total_size} bytes",
+        )
+
+    @staticmethod
+    def _atomic_write(
+        path: Path,
+        content: str,
+        create_dirs: bool,
+        append: bool,
+    ) -> None:
+        if create_dirs and path.parent != Path("."):
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not append:
+            tmp_path = path.with_suffix(path.suffix + ".clawcode_tmp")
+            tmp_path.write_text(content, encoding="utf-8", newline="\n")
+            tmp_path.replace(path)
+        else:
+            with open(path, "a", encoding="utf-8", newline="\n") as f:
+                f.write(content)
 
 
 class EditTool(BaseTool):

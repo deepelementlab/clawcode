@@ -11,7 +11,7 @@ from typing import Any
 
 
 _UI_HINT_RE = re.compile(
-    r"(ui|界面|页面|组件|样式|css|tailwind|布局|主题|颜色|字体|design|frontend|前端)",
+    r"(ui|ux|界面|页面|主页|仪表盘|组件|样式|css|html|tailwind|布局|主题|颜色|字体|图标|按钮|表单|弹窗|导航|交互|design|frontend|前端)",
     re.IGNORECASE,
 )
 

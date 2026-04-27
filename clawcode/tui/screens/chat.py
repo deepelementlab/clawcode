@@ -3195,12 +3195,26 @@ class ChatScreen(Screen):
         )
         run_state.task = task
 
+    # Scene tags that are too generic to indicate UI intent alone.
+    _AMBIGUOUS_SCENE_TAGS: frozenset[str] = frozenset({"performance", "analytics"})
+
+    def _is_ui_related_task(self, request: str) -> bool:
+        if is_ui_intent(request):
+            return True
+        scene_tags = derive_scene_tags(request)
+        specific_tags = [t for t in scene_tags if t not in self._AMBIGUOUS_SCENE_TAGS]
+        if specific_tags:
+            return True
+        return False
+
     def _apply_ui_style_prefix(self, raw_content: str, content_for_agent: str) -> str:
         ui_style_mode = getattr(self.settings, "ui_style_mode", "off") or "off"
         if ui_style_mode not in ("on", "hybrid"):
             return content_for_agent
         try:
             ui_locked = getattr(self.settings, "ui_style_selected", "") or ""
+            if not ui_locked and not self._is_ui_related_task(raw_content):
+                return content_for_agent
             wd_val = (self.settings.working_directory or ".").strip() or "."
             cli_dir = getattr(self.settings, "cli_launch_directory", None) or None
             catalog = load_ui_catalog(wd_val, cli_launch_directory=cli_dir)

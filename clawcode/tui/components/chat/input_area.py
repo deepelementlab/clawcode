@@ -7,6 +7,7 @@ and support for multi-line input and file attachments.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -1405,10 +1406,77 @@ class MessageInput(Static):
             pass
         return ""
 
+    async def _get_clipboard_files(self) -> list[str] | None:
+        from ...clipboard_os import clipboard_read_files
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(clipboard_read_files),
+                timeout=3.0,
+            )
+        except (asyncio.TimeoutError, Exception):
+            return None
+
+    async def _extract_paths_from_clipboard(self, text: str) -> tuple[str, list[FileAttachment]]:
+        """Scan pasted text for full file paths; extract as attachments (Claude Code style)."""
+        attachments: list[FileAttachment] = []
+        lines = text.splitlines(keepends=True)
+        new_lines: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                new_lines.append(line)
+                continue
+            p = Path(stripped)
+            try:
+                if (p.is_absolute() or (os.name == "nt" and len(stripped) >= 2 and stripped[1] == ":")) and p.is_file():
+                    try:
+                        att = FileAttachment.from_path(str(p.resolve()))
+                        attachments.append(att)
+                        continue
+                    except Exception:
+                        new_lines.append(line)
+                        continue
+            except OSError:
+                pass
+            new_lines.append(line)
+        new_text = "".join(new_lines)
+        return new_text, attachments
+
     async def _paste_into_textarea(self, text_input: TextArea) -> None:
+        # 1. Try clipboard files first (Ctrl+V with files in clipboard)
+        file_paths = await self._get_clipboard_files()
+        if file_paths:
+            attachments = []
+            for fp in file_paths:
+                try:
+                    p = Path(fp)
+                    if p.is_file():
+                        attachments.append(FileAttachment.from_path(str(p)))
+                except Exception:
+                    continue
+            if attachments:
+                self.add_attachments(attachments)
+                try:
+                    self.focus()
+                except Exception:
+                    pass
+                return
+
         text = await self._get_clipboard()
         if not text:
             return
+
+        # 2. Claude Code style: detect full file paths in pasted text
+        text, extra_attachments = await self._extract_paths_from_clipboard(text)
+        if extra_attachments:
+            self.add_attachments(extra_attachments)
+            if not text.strip():
+                try:
+                    self.focus()
+                except Exception:
+                    pass
+                return
+
         # Try TextArea native paste/insert APIs if present.
         for method_name in ("insert", "insert_text", "paste"):
             try:

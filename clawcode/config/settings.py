@@ -30,6 +30,7 @@ from .constants import (
     ModelProvider,
 )
 from ..deepnote.wiki_config import DeepNoteConfig
+from ..research.settings_models import ResearchConfig
 
 
 class MCPServer(BaseModel):
@@ -637,6 +638,9 @@ class Settings(BaseSettings):
     closed_loop: ClosedLoopConfig = Field(default_factory=ClosedLoopConfig)
     # DeepNote wiki (llm-wiki compatible, improved)
     deepnote: DeepNoteConfig = Field(default_factory=DeepNoteConfig)
+
+    # Research mode (multi-phase workflows, optional external backend)
+    research: ResearchConfig = Field(default_factory=ResearchConfig)
 
     # Debug
     debug: bool = False

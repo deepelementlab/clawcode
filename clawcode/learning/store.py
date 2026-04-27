@@ -88,18 +88,19 @@ def record_tool_observation_async(
         loop = asyncio.get_running_loop()
         loop.run_in_executor(
             None,
-            record_tool_observation,
-            settings,
-            phase,
-            session_id,
-            tool_name,
-            tool_call_id,
-            tool_input,
-            tool_output,
-            is_error,
-            source_provider,
-            source_model,
-            reasoning_effort,
+            lambda: record_tool_observation(
+                settings,
+                phase=phase,
+                session_id=session_id,
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                tool_input=tool_input,
+                tool_output=tool_output,
+                is_error=is_error,
+                source_provider=source_provider,
+                source_model=source_model,
+                reasoning_effort=reasoning_effort,
+            ),
         )
     except RuntimeError:
         record_tool_observation(

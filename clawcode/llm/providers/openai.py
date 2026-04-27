@@ -6,9 +6,12 @@ This module provides integration with OpenAI's GPT models and O series reasoning
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from typing import Any, AsyncIterator, Literal
+
+_logger = logging.getLogger(__name__)
 
 from openai import AsyncOpenAI
 
@@ -79,6 +82,19 @@ NO_FUNCTION_CALLING_MODELS = {
 }
 
 _TOOL_ECHO_START_RE = re.compile(r"^\s*(?:\{|\[|```json)", re.IGNORECASE)
+
+_THINKING_ERROR_KEYWORDS = frozenset({
+    "reasoning_content",
+    "thinking mode",
+    "thinking",
+    "enable_thinking",
+    "thinking must",
+})
+
+
+def _is_thinking_mode_error(exc: Exception) -> bool:
+    err_str = str(exc).lower()
+    return any(kw in err_str for kw in _THINKING_ERROR_KEYWORDS)
 
 
 class OpenAIProvider(BaseProvider):
@@ -260,6 +276,14 @@ class OpenAIProvider(BaseProvider):
         # Convert messages to OpenAI format (handles multimodal content)
         openai_messages = self._convert_messages(messages, tools_present=tools_present)
 
+        # Failsafe: strip reasoning_content from every message when the adapter
+        # does not require it (e.g. non-reasoning DeepSeek models).  This is the
+        # last line of defence — no reasoning_content may reach the API for
+        # models that cannot process it.
+        if not self.should_inject_reasoning_history(tools_present=tools_present):
+            for m in openai_messages:
+                m.pop("reasoning_content", None)
+
         request_params: dict[str, Any] = {
             "model": self._model,
             "messages": openai_messages,
@@ -297,6 +321,18 @@ class OpenAIProvider(BaseProvider):
             stream=stream,
         )
 
+        # Safety net: when the adapter does not need reasoning history injection,
+        # strip any thinking-related params that may have been added unconditionally.
+        if not self.should_inject_reasoning_history(tools_present=tools_present):
+            extra_body = request_params.get("extra_body")
+            if isinstance(extra_body, dict):
+                extra_body.pop("thinking", None)
+                extra_body.pop("enable_thinking", None)
+                extra_body.pop("include_reasoning", None)
+                extra_body.pop("clear_thinking", None)
+                if not extra_body:
+                    request_params.pop("extra_body", None)
+
         return request_params
 
     async def send_messages(
@@ -320,7 +356,23 @@ class OpenAIProvider(BaseProvider):
         async def _do_call():
             return await self._client.chat.completions.create(**request_params)
 
-        response = await self._with_retry(_do_call)
+        try:
+            response = await self._with_retry(_do_call)
+        except Exception as e:
+            if not _is_thinking_mode_error(e):
+                raise
+            for msg in messages:
+                msg.pop("reasoning_content", None)
+            extra_body = request_params.get("extra_body")
+            if isinstance(extra_body, dict):
+                extra_body.pop("thinking", None)
+                extra_body.pop("enable_thinking", None)
+                extra_body.pop("include_reasoning", None)
+            _logger.info(
+                "Auto-degraded thinking mode: retrying without reasoning for model=%s",
+                self._model,
+            )
+            response = await self._with_retry(_do_call)
 
         # Parse response
         message = response.choices[0].message
@@ -431,7 +483,23 @@ class OpenAIProvider(BaseProvider):
         async def _start_stream():
             return await self._client.chat.completions.create(**request_params)
 
-        stream = await self._with_retry(_start_stream)
+        try:
+            stream = await self._with_retry(_start_stream)
+        except Exception as e:
+            if not _is_thinking_mode_error(e):
+                raise
+            for msg in messages:
+                msg.pop("reasoning_content", None)
+            extra_body = request_params.get("extra_body")
+            if isinstance(extra_body, dict):
+                extra_body.pop("thinking", None)
+                extra_body.pop("enable_thinking", None)
+                extra_body.pop("include_reasoning", None)
+            _logger.info(
+                "Auto-degraded thinking mode (stream): retrying without reasoning for model=%s",
+                self._model,
+            )
+            stream = await self._with_retry(_start_stream)
 
         content_buffer = []
         thinking_buffer = []

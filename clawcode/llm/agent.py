@@ -1237,8 +1237,8 @@ class Agent:
         if tool_name == "write":
             _write_params = tool_call.get_input_dict()
             _content_len = len(_write_params.get("content", ""))
-            # Add 30s per 100KB to avoid large-file timeouts
-            TOOL_TIMEOUT += (_content_len // 100_000) * 30
+            # +5s base + 20s per 100KB (more generous to account for disk I/O variance)
+            TOOL_TIMEOUT = max(TOOL_TIMEOUT, 10) + (_content_len // 100_000) * 20
 
         context = ToolContext(
             session_id=session_id,
@@ -1268,6 +1268,11 @@ class Agent:
             if not _coerced_params:
                 # Fallback to get_input_dict if _coerce_tool_params returns empty
                 _coerced_params = tool_call.get_input_dict()
+            # Feed coerced params back for write/edit tools so their run()
+            # method receives already-normalized input (avoids re-parsing
+            # malformed JSON from models like GLM).
+            if tool_name in ("write", "edit"):
+                tool_call.input = _coerced_params
 
             _pilot_err = pilot_validate_tool_input(
                 tool_name, _coerced_params
@@ -1615,45 +1620,46 @@ class Agent:
         content: str,
         attachments: list[Any] | None = None,
     ) -> Message:
-        """Create a user message with optional attachments.
-
-        Args:
-            session_id: Session ID
-            content: Text content
-            attachments: Optional file attachments
-
-        Returns:
-            Created message
-        """
         parts: list[ContentPart] = []
 
-        # Add text content first
         if content:
             parts.append(TextContent(content=content))
 
-        # Add attachments
         if attachments:
+            inline_parts: list[str] = []
             for attachment in attachments:
-                # Check if attachment has is_image attribute (FileAttachment)
-                is_image = getattr(attachment, "is_image", False)
                 file_path = getattr(attachment, "path", "")
+                file_name = getattr(attachment, "name", "") or Path(file_path).name
+                is_image = getattr(attachment, "is_image", False)
 
                 if is_image:
-                    # Create image content from file
                     try:
                         image_content = ImageContent.from_file(file_path)
                         parts.append(image_content)
+                        inline_parts.append(f"\n[Image: {file_name}]\n")
                     except Exception:
-                        # If image loading fails, skip it
-                        pass
+                        inline_parts.append(f"\n[Image: {file_name} (failed to load)]\n")
                 else:
-                    # Create file content
                     try:
-                        file_content = FileContent.from_file(file_path)
-                        parts.append(file_content)
+                        p = Path(file_path)
+                        if p.is_file():
+                            size = p.stat().st_size
+                            try:
+                                text_content = p.read_text(encoding="utf-8")
+                                preview = text_content[:8000]
+                                truncated = "..." if len(text_content) > 8000 else ""
+                                inline_parts.append(
+                                    f"\n[File: {file_name} ({size} bytes)]\n{preview}{truncated}\n"
+                                )
+                            except UnicodeDecodeError:
+                                inline_parts.append(
+                                    f"\n[File: {file_name} ({size} bytes, binary)]\n"
+                                )
                     except Exception:
-                        # If file loading fails, skip it
-                        pass
+                        inline_parts.append(f"\n[File: {file_name}]\n")
+
+            if inline_parts:
+                parts.append(TextContent(content="".join(inline_parts)))
 
         return await self._message_service.create(
             session_id=session_id,
@@ -1726,17 +1732,6 @@ class Agent:
                 else:
                     self._provider_messages_cache_len = 0
             new_count = len(history)
-        if new_count == 0 and cache:
-            if use_incremental_cache and cache_scope == "background":
-                self._metric_provider_bg_cache_hits += 1
-            result = list(cache)
-            return result
-        if use_incremental_cache and cache_scope == "background":
-            self._metric_provider_bg_cache_misses += 1
-
-        if not cache:
-            system_msg = {"role": "system", "content": self._system_prompt}
-            cache.append(system_msg)
 
         inject_reasoning = False
         try:
@@ -1745,6 +1740,21 @@ class Agent:
                 inject_reasoning = bool(fn(tools_present=tools_present))
         except Exception:
             inject_reasoning = False
+
+        if new_count == 0 and cache:
+            if use_incremental_cache and cache_scope == "background":
+                self._metric_provider_bg_cache_hits += 1
+            result = list(cache)
+            if not inject_reasoning:
+                for row in result:
+                    row.pop("reasoning_content", None)
+            return result
+        if use_incremental_cache and cache_scope == "background":
+            self._metric_provider_bg_cache_misses += 1
+
+        if not cache:
+            system_msg = {"role": "system", "content": self._system_prompt}
+            cache.append(system_msg)
 
         old_provider_rows = len(cache)
         new_msgs = history[cache_len:]
@@ -1761,6 +1771,9 @@ class Agent:
                 self._provider_messages_cache_len = len(history)
 
         result = list(cache)
+        if not inject_reasoning:
+            for row in result:
+                row.pop("reasoning_content", None)
         # Incremental normalize: find the last assistant with tool_calls in the
         # *old* part of the cache.  Only new messages (and the boundary assistant)
         # need rescanning — everything before that point was already correct.

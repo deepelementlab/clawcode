@@ -30,6 +30,7 @@ class _CwdPath(click.Path):
 CWD_PATH = _CwdPath(exists=True, file_okay=False, path_type=Path)
 
 from .saddle_commands import register_saddle_cli
+from ..research.cli import register_research_cli
 
 
 @click.group(invoke_without_command=True)
@@ -522,4 +523,5 @@ def deepnote_run_cycle(cwd: Path | None, window_hours: int, dry_run: bool, apply
     click.echo(f"- evolved_items: {result.get('evolved_items', 0)}")
 
 
+register_research_cli(cli)
 register_saddle_cli(cli)

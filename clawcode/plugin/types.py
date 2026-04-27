@@ -89,6 +89,17 @@ class HookEvent(str, Enum):
     PreCompact = "PreCompact"
     PostCompact = "PostCompact"
 
+    # Research mode (optional plugin hooks)
+    ResearchSessionStart = "ResearchSessionStart"
+    ResearchSessionEnd = "ResearchSessionEnd"
+    ResearchPhaseStart = "ResearchPhaseStart"
+    ResearchPlanCreated = "ResearchPlanCreated"
+    ResearchSubAgentStart = "ResearchSubAgentStart"
+    ResearchSubAgentComplete = "ResearchSubAgentComplete"
+    ResearchVerificationStart = "ResearchVerificationStart"
+    ResearchReportGenerated = "ResearchReportGenerated"
+    ResearchToolRegistered = "ResearchToolRegistered"
+
 
 class HookHandlerType(str, Enum):
     COMMAND = "command"
