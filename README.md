@@ -1,23 +1,23 @@
 <p align="center">
-  <!-- <img width="256" height="256" alt="ClawCode Logo" src="https://github.com/user-attachments/assets/03466089-8b3d-47f8-a454-06a8874eb727" /> -->
-  <img width="1937" height="503" alt="Screenshot - 2026-04-01 20 09 39" src="./assets/ClawCode_Banner_V0.1.2-1.gif" />
+  <img width="1937" height="503" alt="ClawCode Banner" src="./assets/ClawCode_Banner_V0.1.2-1.gif" />
 </p>
 
 <h1 align="center">ClawCode</h1>
 
 <p align="center">
-  <strong>Your creative dev tool — AI coding Swiss Army knife</strong>
+  <strong>Creative engineering cockpit for serious AI builders.</strong>
+</p>
+
+<p align="center">
+  Open-source coding agent platform with terminal-native execution, multi-agent orchestration, and closed-loop learning.
 </p>
 
 <p align="center">
   <a href="https://github.com/deepelementlab/clawcode/releases">
-    <img src="https://img.shields.io/static/v1?style=flat&label=release&labelColor=6A737D&color=fe7d37&message=v0.1.3" alt="Release v0.1.3" />
+    <img src="https://img.shields.io/static/v1?style=flat&label=release&labelColor=6A737D&color=fe7d37&message=v0.1.2" alt="Release v0.1.2" />
   </a>
   <a href="#license"><img src="https://img.shields.io/badge/license-GPL%203.0-blue.svg" alt="License: GPL-3.0" /></a>
-  <a href="https://github.com/deepelementlab/clawcode/wiki"><img src="https://img.shields.io/badge/Wiki-documentation-26A5E4?style=flat&logo=github&logoColor=white" alt="Documentation Wiki"/></a>
-  <a href="https://gitcgr.com/deepelementlab/clawcode">
-    <img src="https://gitcgr.com/badge/nearai/clawcode.svg" alt="gitcgr" />
-  </a>
+  <a href="https://github.com/deepelementlab/clawcode/wiki"><img src="https://img.shields.io/badge/Wiki-documentation-26A5E4?style=flat&logo=github&logoColor=white" alt="Documentation Wiki" /></a>
 </p>
 
 <p align="center">
@@ -28,110 +28,131 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
   <a href="#why-clawcode">Why ClawCode</a> •
-  <a href="#features">Features</a> •
-  <a href="#research-mode">Research</a> •
+  <a href="#what-makes-it-different">Differentiation</a> •
+  <a href="#core-capabilities">Capabilities</a> •
+  <a href="#research--researchteam">ResearchTeam</a> •
+  <a href="#architecture-at-a-glance">Architecture</a> •
   <a href="#documentation">Documentation</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
 ---
 
-<p align="center">
- <!-- <img width="1937" height="503" alt="Screenshot - 2026-04-01 20 09 39" src="https://github.com/user-attachments/assets/f8433995-74fc-41d5-a52a-18c68991e604" /> -->
-</p>
-
-**ClawCode** is an open-source coding-agent CLI for Anthropic, OpenAI, Gemini, DeepSeek, GLM, Kimi, Ollama, Codex, GitHub Models, and **200+ models** via OpenAI-compatible APIs. It goes beyond code generation — it's a self-improving engineering partner.
+ClawCode is for teams who need more than "prompt in, snippet out."  
+It combines **agent runtime**, **tool execution**, **workflow orchestration**, and **experience learning** into one coherent developer system.
 
 ## Why ClawCode
 
-| Typical AI Coding Tool | ClawCode |
-|------------------------|----------|
-| Suggestion-only chat | **Terminal-native execution** |
-| One-shot answers | **Self-improving learning loop** |
-| Single model, single thread | **14-role virtual R&D team** |
-| No memory | **Persistent sessions + experience capsules** |
-| Vendor lock-in | **200+ models, fully configurable** |
+Most AI coding tools optimize for fast demos. ClawCode optimizes for **repeatable engineering outcomes**:
 
-> **Idea → Memory → Plan → Code → Verify → Review → Learned Experience**
+- **Execution over suggestion**: tools run, files change, outputs are verified.
+- **Orchestration over monologue**: role-based collaboration (`/clawteam`, `research team`) replaces single-agent bottlenecks.
+- **Learning over statelessness**: ECAP/TECAP persists useful patterns across tasks.
+- **Platform over lock-in**: provider-agnostic model layer, OpenAI-compatible endpoints, and extensible tool adapters.
 
-## Features
+> Idea -> Plan -> Execute -> Verify -> Review -> Learn
 
-### ⚡ Terminal-Native Execution
+## What Makes It Different
 
-Analyze, code, verify, and review — all in one surface. No IDE overhead, no context switching.
+| Typical AI Coding Assistant | ClawCode |
+|----------------------------|----------|
+| Chat-first interaction | **Terminal-native execution surface** |
+| Single assistant thread | **Multi-role orchestration with convergence** |
+| Stateless sessions | **Persistent memory via ECAP/TECAP** |
+| Generic answers | **Workflow-driven outputs and artifacts** |
+| Fixed backend assumptions | **Model/provider abstraction + custom adapters** |
 
-```bash
-clawcode                          # Interactive TUI
-clawcode -p "Refactor this API"   # Non-interactive
-clawcode -p "Summarize changes" -f json  # JSON output
-```
+## Core Capabilities
 
-### 🧠 Self-Improving Learning
+### Terminal-native coding agent
 
-ClawCode features **ECAP** (Experience Capsule) and **TECAP** (Team Experience Capsule) — a closed-loop learning system that turns every task into reusable knowledge:
-
-- **Instinct → Experience → Skill** evolution chain
-- Automatic write-back from `/clawteam --deep_loop`
-- Portable, feedback-scored, privacy-controlled capsules
-
-### 🎨 Design Team (`/designteam`)
-
-Spin up specialist design agents (research, IXD, UI, product, visual) and ship structured design specs — not just "chatty UI suggestions."
-
-### 👥 Virtual R&D Team (`/clawteam`)
-
-Orchestrate 14 professional roles in one command:
-
-| Role | Focus |
-|------|-------|
-| Product Manager | Priorities, roadmap |
-| System Architect | Architecture, tech choices |
-| Backend / Frontend / Mobile | Implementation |
-| QA / SRE | Quality, reliability |
-| DevOps / Team Lead | CI/CD, decisions |
+Run interactively (TUI) or non-interactively in automation contexts:
 
 ```bash
-/clawteam "Build a REST API with auth"           # Auto-assign roles
-/clawteam --deep_loop "Design microservice arch" # Convergent iteration
+clawcode
+clawcode -p "Refactor this API and add tests"
+clawcode -p "Summarize git changes as release notes" -f json
 ```
 
-### 🔬 Research Mode (`clawcode research`)
+### Virtual R&D team (`/clawteam`)
 
-Multi-phase investigation workflows with tool-backed evidence collection:
-
-| Workflow | Purpose |
-|----------|---------|
-| `deepresearch` | Template-driven: plan → research → verify → deliver |
-| `peerreview` | Critical review with verification |
-| `lit` | Literature survey |
-| `audit` | Inspect URL/repo/artifact |
-
-**Research tools:** `research_web_search` (Firecrawl/Tavily/Parallel), `research_paper_search` (arXiv/Semantic Scholar), `research_fetch_url`, `research_sandbox_exec`, `research_code_audit`.
+Spin up coordinated specialist roles for architecture, implementation, QA, and delivery decisions:
 
 ```bash
-clawcode research start "Quantum error correction" --workflow deepresearch -o ./outputs/qec
-clawcode research list-prompts  # View available templates
+/clawteam "Build a REST API with auth"
+/clawteam --deep_loop "Design microservice architecture"
 ```
 
-### 🔧 44 Built-in Tools
+### Design team (`/designteam`)
 
-| Category | Examples |
-|----------|----------|
-| File I/O | `view`, `write`, `edit`, `patch`, `grep` |
-| Shell | `bash`, `terminal`, `execute_code` |
-| Browser | `browser_*` (×11 automation tools) |
-| Agent | Subagent spawning with isolation |
-| Integration | MCP, Sourcegraph, Desktop automation |
-| Research | `research_*` (web, papers, audit) |
+Generate structured product/design artifacts from dedicated design roles (research, IXD, UI, PM, visual).
 
+### Tooling surface
 
-### 🔄 Claude Code Compatible
+Built-in tool categories include:
 
-Migration-friendly: supports `.claude/agents/`, Claude-style tool names, plugin/skill systems, and familiar slash workflows.
+- File operations (`view`, `write`, `edit`, `patch`, `grep`)
+- Shell/runtime execution
+- Browser automation
+- Subagent spawning and isolation
+- MCP integrations and external adapters
+- Research tools (`research_*`)
+
+## Research & ResearchTeam
+
+ClawCode includes a production-style research subsystem for evidence-backed investigation pipelines.
+
+### Research workflows
+
+| Workflow | Command | Purpose |
+|----------|---------|---------|
+| `deepresearch` | `clawcode research start "topic" -w deepresearch` | Template pipeline: plan -> research -> verify -> deliver |
+| `peerreview` | `clawcode research start "topic" -w peerreview` | Critical review with verification |
+| `lit` | `clawcode research start "topic" -w lit` | Literature survey |
+| `audit` | `clawcode research audit <url>` | Inspect URL/repo/artifact |
+| `compare` | `clawcode research start "topic" -w compare` | Side-by-side comparison |
+
+### ResearchTeam mode (`teamresearch`)
+
+`ResearchTeam` is the high-rigor mode for complex topics:
+
+- Parallel specialist roles per phase (e.g. literature, analysis, synthesis, verification)
+- Merge strategies (`union`, `conflict_resolution`, `sequential_review`, `consensus`)
+- Convergence checks and bounded iterations
+- Team Experience Capsule (ResearchTECAP) persistence
+
+```bash
+clawcode research team "Quantum error correction" \
+  --roles literature_researcher,deep_analyst,fact_verifier \
+  --strategy hybrid \
+  --max-iters 3
+```
+
+In interactive mode:
+
+```text
+/research team Quantum error correction --strategy hybrid --max-iters 3
+```
+
+Research docs:
+
+- [docs/RESEARCH_MODE.md](docs/RESEARCH_MODE.md)
+- [docs/RESEARCH_TEAM_MODE.md](docs/RESEARCH_TEAM_MODE.md)
+
+## Architecture At A Glance
+
+ClawCode is organized as composable layers:
+
+1. **Agent runtime**: prompt execution, tool mediation, session lifecycle.
+2. **Workflow engine**: phase planning, orchestration, convergence, and reporting.
+3. **Learning loop**: ECAP/TECAP capture, scoring, and reuse.
+4. **Integration plane**: MCP + plugin hooks + external adapters.
+
+This keeps experimentation fast while preserving engineering discipline.
 
 ## Quick Start
 
-### 1. Install
+### 1) Install
 
 ```bash
 cd clawcode
@@ -140,9 +161,9 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
-**Requirements:** Python >=3.12
+Requirements: Python >= 3.12
 
-### 2. Configure
+### 2) Configure provider
 
 Create `.clawcode.json` in your project root:
 
@@ -164,16 +185,30 @@ Create `.clawcode.json` in your project root:
 ```
 
 Or use environment variables:
+
 ```bash
 export CLAWCODE_OPENAI__API_KEY="sk-..."
 ```
 
-### 3. Run
+### 3) Run
 
 ```bash
-clawcode -c "/path/to/project"     # Interactive TUI
-clawcode -p "Refactor this API"    # Non-interactive
+clawcode -c "/path/to/project"   # Interactive TUI
+clawcode -p "Refactor this API"  # Non-interactive
 ```
+
+## Quality, Testing, and Reliability
+
+Core development checks:
+
+```bash
+pytest
+ruff check .
+mypy .
+```
+
+Optional live-provider acceptance tests are available under marker `live_llm` (skipped by default).  
+See "Live LLM acceptance tests (optional)" in [docs/RESEARCH_MODE.md](docs/RESEARCH_MODE.md).
 
 ## Documentation
 
@@ -185,117 +220,21 @@ clawcode -p "Refactor this API"    # Non-interactive
 | Slash Commands Reference | [docs/slash-commands.md](docs/slash-commands.md) |
 | Configuration Guide | [docs/clawcode-configuration.md](docs/clawcode-configuration.md) |
 | Performance & Testing | [docs/clawcode-performance.md](docs/clawcode-performance.md) |
-| Research Mode | [docs/research_mode.md](docs/research_mode.md) |
-
----
-
-## Research Mode
-
-ClawCode includes an independent **research** subcommand for multi-phase investigation workflows with tool-backed evidence collection.
-
-### Workflows
-
-| Workflow | Command | Description |
-|----------|---------|-------------|
-| `deepresearch` | `clawcode research start "topic" -w deepresearch` | 4-phase template: plan → research → verify → deliver |
-| `peerreview` | `clawcode research start "topic" -w peerreview` | Critical review: review → verify → deliver |
-| `lit` | `clawcode research start "topic" -w lit` | Literature survey |
-| `audit` | `clawcode research audit <url>` | Inspect URL/repo/artifact |
-| `compare` | `clawcode research start "topic" -w compare` | Side-by-side comparison |
-
-### Research Tools
-
-- `research_web_search` — Web search with Firecrawl/Tavily/Parallel (DuckDuckGo fallback)
-- `research_paper_search` — arXiv + optional Semantic Scholar
-- `research_fetch_url` — Fetch and extract page content
-- `research_sandbox_exec` — Shell execution in sandbox
-- `research_code_audit` — Compare claims against repo code
-
-### Quick Examples
-
-```bash
-# Deep research with Markdown template phases
-clawcode research start "Quantum error correction" --workflow deepresearch -o ./outputs/qec
-
-# Peer review a proposal
-clawcode research start "Review: LLM scaling laws" --workflow peerreview -o ./outputs/review
-
-# Audit a repository
-clawcode research audit https://github.com/example/repo -o ./outputs/audit
-
-# List available templates
-clawcode research list-prompts
-
-# Validate config without calling LLM
-clawcode research start "Test" --dry-run
-```
-
-### Configuration
-
-Add to `.clawcode.json`:
-
-```json
-{
-  "web": {
-    "backend": "firecrawl",
-    "firecrawl_api_key": "YOUR_KEY",
-    "tavily_api_key": "YOUR_KEY",
-    "parallel_api_key": ""
-  },
-  "research": {
-    "enabled": true,
-    "s2_api_key": "YOUR_SEMANTIC_SCHOLAR_KEY",
-    "subagents": { "max_concurrent": 3 }
-  }
-}
-```
-
-**Optional API keys:**
-- [Firecrawl](https://firecrawl.dev) — Enhanced web search/extraction
-- [Tavily](https://tavily.com) — Research-optimized search
-- [Parallel](https://parallel.ai) — Alternative search backend
-- [Semantic Scholar](https://www.semanticscholar.org/product/api) — Higher rate limits for papers
-
-Without API keys, research falls back to DuckDuckGo (web) and arXiv (papers, no key required).
-
----
-
-## Test Results
-
-| Suite | Tests | Status |
-|-------|-------|--------|
-| Unit + Integration | 833 | ✅ |
-| CLI Flags | 22 | ✅ |
-| TUI Interactions | 27 | ✅ |
-| Real Skills + Plugins | 53 | ✅ |
-
-**Total:** 944 items. **935 passed, 9 skipped, 0 failed.**
-
-## Tiered Onboarding
-
-| Level | Time | Steps |
-|-------|------|-------|
-| Run it | ~5 min | Install → `clawcode -p "..."` → try `/clawteam` |
-| Close the loop | ~30 min | Real task → `/clawteam --deep_loop` → inspect write-back |
-| Team rollout | Repeatable | Align model → inventory skills → wire ECAP feedback |
+| Research Mode | [docs/RESEARCH_MODE.md](docs/RESEARCH_MODE.md) |
+| ResearchTeam Mode | [docs/RESEARCH_TEAM_MODE.md](docs/RESEARCH_TEAM_MODE.md) |
 
 ## Contributing
 
-```bash
-pytest
-ruff check .
-mypy .
-```
-
-For larger design changes, open an issue first.
+Issues and PRs are welcome. For larger architecture or workflow changes, open an issue first to align on scope and review criteria.
 
 ## Security
 
-AI tooling may run commands and modify files. Use ClawCode in a controlled environment, review outputs, and apply least privilege.
+AI tooling can execute commands and modify files.  
+Run ClawCode in controlled environments, apply least privilege to credentials, and review generated changes before merge.
 
 ## License
 
-GPL-3.0 license.
+GPL-3.0.
 
 ---
 
