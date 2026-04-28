@@ -99,6 +99,11 @@ class HookEvent(str, Enum):
     ResearchVerificationStart = "ResearchVerificationStart"
     ResearchReportGenerated = "ResearchReportGenerated"
     ResearchToolRegistered = "ResearchToolRegistered"
+    ResearchTaskSpawned = "ResearchTaskSpawned"
+    ResearchEvidenceFound = "ResearchEvidenceFound"
+    ResearchCitationAdded = "ResearchCitationAdded"
+    ResearchVerificationComplete = "ResearchVerificationComplete"
+    ResearchConflictDetected = "ResearchConflictDetected"
 
 
 class HookHandlerType(str, Enum):

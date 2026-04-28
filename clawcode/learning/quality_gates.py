@@ -63,3 +63,18 @@ def evaluate_evolved_skill_quality(
         "short_circuit_import": not ok,
     }
 
+
+def passes_research_experience_quality_gate(
+    *,
+    evidence_quality: float,
+    source_count: int,
+    min_evidence_quality: float = 0.7,
+    min_source_count: int = 3,
+) -> tuple[bool, str]:
+    """Simple quality gate for research-derived experience patterns."""
+    if evidence_quality < float(min_evidence_quality):
+        return False, f"low_evidence_quality:{evidence_quality:.3f}"
+    if int(source_count) < int(min_source_count):
+        return False, f"insufficient_sources:{source_count}"
+    return True, "ok"
+

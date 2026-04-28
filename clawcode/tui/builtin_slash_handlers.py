@@ -1852,6 +1852,138 @@ async def handle_builtin_slash(
         prompt = _build_architect_prompt(args)
         return BuiltinSlashOutcome(kind="agent_prompt", agent_user_text=prompt)
 
+    if head == "research":
+        usage = (
+            "Usage:\n"
+            "- `/research help`\n"
+            "- `/research list-workflows`\n"
+            "- `/research list-prompts`\n"
+            "- `/research start <topic...> [-w <workflow>] [-m <model>] [-o <output>] [--dry-run]`\n"
+            "- `/research audit <target...> [-o <output>] [--dry-run]`\n\n"
+            "Examples:\n"
+            "- `/research start 量子纠错 -w deepresearch -o ./outputs/qec`\n"
+            "- `/research start LLM scaling laws -w peerreview`\n"
+            "- `/research audit https://github.com/example/repo`\n"
+            "- `/research list-prompts`\n"
+        )
+        try:
+            parts = shlex.split(tail or "")
+        except ValueError as e:
+            return BuiltinSlashOutcome(
+                kind="assistant_message",
+                assistant_text=f"Invalid `/research` arguments: {e}\n\n{usage}",
+            )
+        if not parts or parts[0] in {"help", "-h", "--help"}:
+            return BuiltinSlashOutcome(kind="assistant_message", assistant_text=usage)
+
+        sub = parts[0].strip().lower()
+        if sub == "list-workflows":
+            from ..research.engine.workflow import WORKFLOW_CHOICES
+
+            return BuiltinSlashOutcome(
+                kind="assistant_message",
+                assistant_text=(
+                    "# research workflows\n\n"
+                    + "\n".join(f"- `{w}`" for w in WORKFLOW_CHOICES)
+                    + "\n\nUse `/research start <topic> -w <workflow>`."
+                ),
+            )
+        if sub == "list-prompts":
+            from ..research.engine.prompt_workflow import PromptWorkflowEngine
+
+            engine = PromptWorkflowEngine(Path(__file__).resolve().parents[1] / "research" / "prompts")
+            rows = engine.template_summaries()
+            if not rows:
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text="No research prompt templates found.",
+                )
+            lines = ["# research prompt templates\n\n"]
+            for row in rows:
+                phases = ", ".join(str(x) for x in (row.get("phases") or [])) or "-"
+                lines.append(f"- `{row.get('id', '')}`: {row.get('description', '')}\n")
+                lines.append(f"  - phases: {phases}\n")
+            lines.append("\nRun with `/research start <topic> -w <template-id>`.")
+            return BuiltinSlashOutcome(kind="assistant_message", assistant_text="".join(lines))
+
+        if sub not in {"start", "audit"}:
+            return BuiltinSlashOutcome(
+                kind="assistant_message",
+                assistant_text=f"Unknown `/research` subcommand: `{sub}`\n\n{usage}",
+            )
+
+        workflow = "deep"
+        model: str | None = None
+        output: str | None = None
+        dry_run = False
+        free: list[str] = []
+        i = 1
+        while i < len(parts):
+            t = parts[i]
+            if t in {"-w", "--workflow"}:
+                if i + 1 >= len(parts):
+                    return BuiltinSlashOutcome(kind="assistant_message", assistant_text=f"Missing value for `{t}`.\n\n{usage}")
+                workflow = parts[i + 1].strip()
+                i += 2
+                continue
+            if t in {"-m", "--model"}:
+                if i + 1 >= len(parts):
+                    return BuiltinSlashOutcome(kind="assistant_message", assistant_text=f"Missing value for `{t}`.\n\n{usage}")
+                model = parts[i + 1].strip()
+                i += 2
+                continue
+            if t in {"-o", "--output"}:
+                if i + 1 >= len(parts):
+                    return BuiltinSlashOutcome(kind="assistant_message", assistant_text=f"Missing value for `{t}`.\n\n{usage}")
+                output = parts[i + 1].strip()
+                i += 2
+                continue
+            if t == "--dry-run":
+                dry_run = True
+                i += 1
+                continue
+            free.append(t)
+            i += 1
+
+        subject = " ".join(free).strip()
+        if not subject:
+            kind = "topic" if sub == "start" else "target"
+            return BuiltinSlashOutcome(
+                kind="assistant_message",
+                assistant_text=f"`/research {sub}` requires a {kind}.\n\n{usage}",
+            )
+
+        if sub == "start":
+            from ..research.engine.workflow import normalize_workflow
+
+            normalized = normalize_workflow(workflow)
+            prompt = (
+                "You are executing the in-chat `/research start` workflow.\n"
+                f"- Topic: {subject}\n"
+                f"- Workflow: {normalized}\n"
+                f"- Output dir: {output or './outputs/research'}\n"
+                f"- Model override: {model or '(default from settings)'}\n"
+                f"- Dry run: {'yes' if dry_run else 'no'}\n\n"
+                "Tasks:\n"
+                "1) If dry-run=yes, only validate config/workflow and report what would run.\n"
+                "2) Otherwise run the selected research workflow end-to-end using research tools.\n"
+                "3) Return phase-by-phase progress summary and final artifact paths.\n"
+                "4) Mention if DeepNote/ECAP closed-loop export is enabled and whether it was triggered.\n"
+            )
+            return BuiltinSlashOutcome(kind="agent_prompt", agent_user_text=prompt)
+
+        prompt = (
+            "You are executing the in-chat `/research audit` workflow.\n"
+            f"- Audit target: {subject}\n"
+            f"- Output dir: {output or './outputs/research-audit'}\n"
+            f"- Dry run: {'yes' if dry_run else 'no'}\n\n"
+            "Tasks:\n"
+            "1) If dry-run=yes, only validate config/workflow and report what would run.\n"
+            "2) Otherwise run a single-phase audit with evidence collection.\n"
+            "3) Output severity-ranked findings and final artifact paths.\n"
+        )
+        return BuiltinSlashOutcome(kind="agent_prompt", agent_user_text=prompt)
+
     if head == "clawteam":
         selected_agent, request, deep_loop, max_iters, err = _parse_clawteam_args(tail)
         if err:

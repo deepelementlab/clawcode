@@ -4,10 +4,12 @@ from __future__ import annotations
 
 WORKFLOW_CHOICES: tuple[str, ...] = (
     "deep",
+    "deepresearch",
     "lit",
     "audit",
     "compare",
     "replicate",
+    "peerreview",
 )
 
 

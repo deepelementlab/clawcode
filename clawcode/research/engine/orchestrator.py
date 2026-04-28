@@ -19,16 +19,19 @@ from ..agents.middlewares import (
     TokenUsageMiddleware,
 )
 from ..config import topic_slug
+from ..ledger import LedgerManager
 from ..memory.middleware import ResearchMemoryPipelineMiddleware
 from ..memory.queue import MemoryWriteQueue
 from ..memory.storage import ResearchMemoryStorage
 from ..sandbox.provider import get_sandbox_for_settings
 from ..subagents.executor import SubAgentExecutor
 from ..subagents.registry import SubAgentRegistry, register_builtin_subagents
+from ..deepnote_exporter import DeepNoteExporter
 from ..tools.bridge import research_tools_as_base_tools
 from ..tools.registry import ToolRegistry, fire_research_hooks
 from ..types import ResearchEvent, ResearchTask
 from ...plugin.types import HookEvent
+from ...deepnote.learning_service import DeepNoteLearningService
 from ..workflows import (
     phases_audit,
     phases_compare,
@@ -36,6 +39,7 @@ from ..workflows import (
     phases_literature,
     phases_replicate,
 )
+from .prompt_workflow import PromptWorkflowEngine
 from .workflow import normalize_workflow
 
 
@@ -67,8 +71,12 @@ class ResearchOrchestrator:
         self._tools = ToolRegistry(
             plugin_manager=getattr(app_ctx, "plugin_manager", None),
             sandbox=sbx,
+            settings=self._settings,
         )
-        _research_base_tools = research_tools_as_base_tools(self._tools)
+        _research_base_tools = research_tools_as_base_tools(
+            self._tools,
+            settings=self._settings,
+        )
         self._lead = LeadResearchAgent(
             app_ctx,
             pre,
@@ -94,6 +102,10 @@ class ResearchOrchestrator:
             return text
 
         self._subagents.set_runner(_subagent_runner)
+        self._prompt_workflows = PromptWorkflowEngine(
+            Path(__file__).resolve().parents[1] / "prompts"
+        )
+        self._deepnote_exporter = DeepNoteExporter(self._settings)
 
     @property
     def tool_registry(self) -> ToolRegistry:
@@ -103,6 +115,11 @@ class ResearchOrchestrator:
         slug = topic_slug(task.topic)
         wf = normalize_workflow(task.workflow_type)
         out_dir = task.output_dir
+        if wf in ("deepresearch", "peerreview"):
+            prompt_name = "deepresearch" if wf == "deepresearch" else "peerreview"
+            phases = self._prompt_workflows.load(prompt_name, task.topic)
+            if phases:
+                return phases
         if wf == "lit":
             return phases_literature(task.topic, slug, out_dir)
         if wf == "audit":
@@ -170,6 +187,18 @@ class ResearchOrchestrator:
         )
         phases = self._select_phases(task)
         combined: list[str] = []
+        ledger = LedgerManager(task.output_dir)
+        led = ledger.create_task(
+            agent="lead",
+            prompt=task.topic,
+            output_file=f"{topic_slug(task.topic)}-run-summary.md",
+        )
+        ledger.update_status(led.task_id, "running")
+        await fire_research_hooks(
+            pm,
+            HookEvent.ResearchTaskSpawned,
+            {"task_id": led.task_id, "agent": "lead", "topic": task.topic},
+        )
         try:
             for phase in phases:
                 await fire_research_hooks(
@@ -211,4 +240,32 @@ class ResearchOrchestrator:
         summary_path = task.output_dir / f"{slug}-run-summary.md"
         task.output_dir.mkdir(parents=True, exist_ok=True)
         summary_path.write_text(bundle, encoding="utf-8")
+        self._deepnote_exporter.export_summary(
+            topic=task.topic,
+            workflow=task.workflow_type,
+            summary_path=summary_path,
+        )
+        self._run_research_learning_feedback()
+        ledger.update_status(led.task_id, "done")
+        await fire_research_hooks(
+            pm,
+            HookEvent.ResearchVerificationComplete,
+            {"task_id": led.task_id, "summary_path": str(summary_path)},
+        )
         yield ResearchEvent("done", {"summary_path": str(summary_path)})
+
+    def _run_research_learning_feedback(self) -> None:
+        dcfg = getattr(self._settings, "deepnote", None)
+        if not dcfg or not bool(getattr(dcfg, "enabled", False)):
+            return
+        closed = getattr(dcfg, "closed_loop", None)
+        if not closed or not bool(getattr(closed, "enabled", False)):
+            return
+        try:
+            # Keep run latency stable: this is best-effort incremental enrichment.
+            DeepNoteLearningService(settings=self._settings).run_research_learning_cycle(
+                window_hours=168,
+                dry_run=False,
+            )
+        except Exception:
+            pass

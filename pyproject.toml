@@ -177,6 +177,7 @@ testpaths = ["tests"]
 addopts = "-v --cov=clawcode --cov-report=term-missing"
 markers = [
     "integration: optional tests needing external binaries or network (e.g. agent-browser)",
+    "live_llm: optional tests that call a configured LLM provider (set CLAWCODE_RESEARCH_LIVE_TEST=1)",
 ]
 
 [tool.mypy]

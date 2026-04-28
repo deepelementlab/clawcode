@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -9,6 +10,7 @@ class WorkflowPhase:
     phase_id: str
     system: str
     user: str
+    metadata: dict[str, Any] | None = None
 
 
 def iter_phase_tuples(phases: list[WorkflowPhase]) -> list[tuple[str, str, str]]:

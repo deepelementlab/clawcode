@@ -291,6 +291,10 @@ BUILTIN_SLASH_COMMANDS: list[tuple[str, str]] = [
         "Run sequential multi-role workflow (HANDOFF between planner/TDD/review/security/architect); `/orchestrate show|list`",
     ),
     (
+        "research",
+        "Run research workflows in-chat (`/research start|audit|list-prompts|list-workflows|help`)",
+    ),
+    (
         "learn",
         "Learn reusable instincts from recent tool observations",
     ),

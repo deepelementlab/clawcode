@@ -9,9 +9,11 @@ from typing import Any
 from ..config.settings import Settings
 from ..learning.experience_store import save_capsule
 from ..learning.models import Instinct
+from ..learning.quality_gates import passes_research_experience_quality_gate
 from ..learning.service import LearningService
 from ..learning.store import load_all_instincts, read_recent_observations
 from .experience_builder import DeepNoteExperienceBuilder
+from .research_experience_builder import ResearchExperienceBuilder
 from .wiki_store import WikiStore
 
 
@@ -41,6 +43,7 @@ class DeepNoteLearningService:
         self.base_svc = base_learning_service or LearningService(settings)
         self.config = config or DeepNoteLearningConfig()
         self.builder = DeepNoteExperienceBuilder()
+        self.research_builder = ResearchExperienceBuilder()
 
     def _fetch_observations(self, *, window_hours: int = 168) -> list[dict[str, Any]]:
         cutoff = time.time() - max(1, window_hours) * 3600
@@ -70,6 +73,26 @@ class DeepNoteLearningService:
             "total_pages": int(stats.get("total_pages", 0)),
             "repo_fingerprint": Path(self.settings.working_directory or ".").resolve().name,
         }
+
+    def _fetch_research_observations(self, *, window_hours: int = 168) -> list[dict[str, Any]]:
+        cutoff = time.time() - max(1, window_hours) * 3600
+        rows = read_recent_observations(self.settings, limit=1600)
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            tool = str(row.get("tool", "")).strip()
+            if not tool.startswith("research_"):
+                continue
+            ts = str(row.get("timestamp", "") or "")
+            if ts:
+                try:
+                    dt = ts.replace("Z", "+00:00")
+                    parsed = time.mktime(time.strptime(dt[:19], "%Y-%m-%dT%H:%M:%S"))
+                    if parsed < cutoff:
+                        continue
+                except Exception:
+                    pass
+            out.append(row)
+        return out
 
     def _write_evolved_skill_note(self, ecap_id: str, pattern_type: str) -> Path:
         out_dir = self.base_svc.paths.evolved_skills_dir
@@ -126,6 +149,43 @@ class DeepNoteLearningService:
             "generated_capsules": generated_ids,
             "evolved_items": len(evolved),
             "evolved_paths": evolved,
+            "dry_run": dry_run,
+        }
+
+    def run_research_learning_cycle(
+        self,
+        *,
+        window_hours: int = 168,
+        dry_run: bool = True,
+    ) -> dict[str, Any]:
+        observations = self._fetch_research_observations(window_hours=window_hours)
+        patterns = self.research_builder.analyze_observations(observations)
+        instincts: list[Instinct] = load_all_instincts(self.settings)
+        generated_ids: list[str] = []
+        for p in patterns:
+            ok, reason = passes_research_experience_quality_gate(
+                evidence_quality=p.evidence_quality,
+                source_count=len(p.sources_used),
+            )
+            if not ok:
+                continue
+            cap = self.research_builder.build_ecap_from_pattern(
+                p,
+                observations=observations,
+                instincts=instincts,
+                session_id="research",
+            )
+            cap.governance.reviewed_by = f"research_quality_gate:{reason}"
+            cap.context.constraints.append(json.dumps(self._context_payload(), ensure_ascii=False))
+            if not dry_run:
+                saved = save_capsule(self.settings, cap)
+                generated_ids.append(saved.stem)
+        return {
+            "enabled": True,
+            "observations_count": len(observations),
+            "patterns_detected": len(patterns),
+            "ecaps_generated": 0 if dry_run else len(generated_ids),
+            "generated_capsules": generated_ids,
             "dry_run": dry_run,
         }
 

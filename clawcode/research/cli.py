@@ -56,6 +56,36 @@ def research_list_workflows() -> None:
         click.echo(w)
 
 
+@research_cli.command("list-prompts")
+def research_list_prompts() -> None:
+    """List Markdown template workflows (deepresearch, peerreview, …) with phases."""
+    from pathlib import Path
+
+    from .engine.prompt_workflow import PromptWorkflowEngine
+
+    prompts_dir = Path(__file__).resolve().parent / "prompts"
+    engine = PromptWorkflowEngine(prompts_dir)
+    summaries = engine.template_summaries()
+    if not summaries:
+        click.echo("(no prompt templates found)")
+        return
+    for row in summaries:
+        click.echo(row["id"])
+        if row.get("name"):
+            click.echo(f"  name: {row['name']}")
+        if row.get("description"):
+            click.echo(f"  description: {row['description']}")
+        if row.get("workflow_id"):
+            click.echo(f"  workflow_id: {row['workflow_id']}")
+        if row.get("agents"):
+            click.echo(f"  agents: {row['agents']}")
+        phases = row.get("phases") or []
+        if phases:
+            click.echo(f"  phases: {', '.join(phases)}")
+        click.echo("  CLI: clawcode research start TOPIC -w " + row["id"])
+        click.echo("")
+
+
 @research_cli.command("start")
 @click.argument("topic")
 @click.option(

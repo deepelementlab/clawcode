@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from .config import SubAgentJobConfig
 
 
@@ -17,39 +19,43 @@ class SubAgentRegistry:
 
 
 def register_builtin_subagents(reg: SubAgentRegistry) -> None:
+    prompts_dir = Path(__file__).resolve().parents[1] / "agents" / "prompts"
+
+    def _prompt(name: str, fallback: str) -> str:
+        p = prompts_dir / f"{name}.md"
+        try:
+            txt = p.read_text(encoding="utf-8").strip()
+            if txt:
+                return txt
+        except OSError:
+            pass
+        return fallback
+
     reg.register(
         SubAgentJobConfig(
             name="researcher",
-            system_prompt=(
-                "You gather evidence: cite sources, prefer primary documents, "
-                "and return a concise bullet memo with URLs or paper IDs when possible."
+            system_prompt=_prompt(
+                "researcher",
+                "Gather evidence with concise citations and links.",
             ),
         )
     )
     reg.register(
         SubAgentJobConfig(
             name="reviewer",
-            system_prompt=(
-                "You perform a critical peer-review style pass: severity-tagged issues, "
-                "missing evaluations, and a short revision plan."
-            ),
+            system_prompt=_prompt("reviewer", "Review findings critically and tag issue severity."),
         )
     )
     reg.register(
         SubAgentJobConfig(
             name="writer",
-            system_prompt=(
-                "You turn structured notes into a polished Markdown report with clear sections."
-            ),
+            system_prompt=_prompt("writer", "Write polished Markdown from research notes."),
         )
     )
     reg.register(
         SubAgentJobConfig(
             name="verifier",
-            system_prompt=(
-                "You check claims against provided excerpts: flag unverified statements "
-                "and list required citations."
-            ),
+            system_prompt=_prompt("verifier", "Verify claims and list missing citations."),
         )
     )
     reg.register(
