@@ -80,6 +80,8 @@ Your tools should serve your workflow, not a vendor's ecosystem. Provider-agnost
 | Stateless sessions | **Persistent memory via ECAP/TECAP** |
 | Generic answers | **Workflow-driven outputs and artifacts** |
 | Fixed backend assumptions | **Model/provider abstraction + custom adapters** |
+| No personal knowledge support | **DeepNote wiki + notebook interop for personal/team knowledge** |
+| One-size-fits-all | **12 built-in vertical domains + extensible domain registry** |
 
 ## Core Capabilities
 
