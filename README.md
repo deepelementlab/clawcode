@@ -26,8 +26,8 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#why-clawcode">Why ClawCode</a> •
+  <a href="#the-story-behind-clawcode">Our Story</a> •
+  <a href="#design-philosophy">Philosophy</a> •
   <a href="#what-makes-it-different">Differentiation</a> •
   <a href="#core-capabilities">Capabilities</a> •
   <a href="#research--researchteam">ResearchTeam</a> •
@@ -41,19 +41,35 @@
 
 ---
 
-ClawCode is for teams who need more than "prompt in, snippet out."
-It combines **agent runtime**, **tool execution**, **workflow orchestration**, and **experience learning** into one coherent developer system.
+## The Story Behind ClawCode
 
-## Why ClawCode
+In 2024, the DeepElementLab team watched the same scene repeat across dozens of engineering teams: a developer would spend an hour debugging an API error handling pattern with an AI assistant, only to start from scratch two days later when the same issue resurfaced in a new session. The assistant was stateless; the knowledge evaporated.
 
-Most AI coding tools optimize for fast demos. ClawCode optimizes for **repeatable engineering outcomes**:
+We asked a systems question: **What if an AI coding assistant could remember, learn, and evolve?**
 
-- **Execution over suggestion**: tools run, files change, outputs are verified.
-- **Orchestration over monologue**: role-based collaboration (`/clawteam`, `research team`) replaces single-agent bottlenecks.
-- **Learning over statelessness**: ECAP/TECAP persists useful patterns across tasks.
-- **Platform over lock-in**: provider-agnostic model layer, OpenAI-compatible endpoints, and extensible tool adapters.
+Not in the sense of a chat history buffer, but in the way a senior engineer accumulates institutional knowledge — debugging patterns, tool sequences, remediation playbooks — and refines them over time. This is the origin of ClawCode.
 
-> Idea -> Plan -> Execute -> Verify -> Review -> Learn
+ClawCode is named after the claw of a craftsman: precise, persistent, and capable of both delicate manipulation and heavy lifting. It represents our belief that AI coding tools should be **engineering instruments**, not just conversational toys. We built it for teams who ship production code, not just prototypes.
+
+Today, ClawCode combines **agent runtime**, **tool execution**, **workflow orchestration**, and **experience learning** into one coherent developer system. It reimagined from the ground up with structured memory, governed autonomy, and multi-agent collaboration.
+
+## Design Philosophy
+
+ClawCode is built on four foundational principles that guide every architectural decision:
+
+### 1. Execution Over Suggestion
+We believe AI assistants should **do**, not just advise. Tools run, files change, outputs are verified. Every conversation is an engineering action with observable side effects.
+
+### 2. Orchestration Over Monologue
+Single-agent bottlenecks are a scaling anti-pattern. Role-based collaboration (`/clawteam`, `research team`) replaces the lone assistant with coordinated specialists — architecture, implementation, QA, and delivery — working toward convergent outcomes.
+
+### 3. Learning Over Statelessness
+Sessions should not be disposable. Our three-tier experience model (**Instinct → ECAP → TECAP**) transforms recurring behavior into reusable, versioned artifacts. The system learns from tool traces, clusters patterns, and evolves skills under governance.
+
+### 4. Platform Over Lock-in
+Your tools should serve your workflow, not a vendor's ecosystem. Provider-agnostic model layer, OpenAI-compatible endpoints, and extensible tool adapters ensure you own your infrastructure.
+
+> **The ClawCode Loop:** Idea → Plan → Execute → Verify → Review → Learn
 
 ## What Makes It Different
 
@@ -98,11 +114,17 @@ Generate structured product/design artifacts from dedicated design roles (resear
 
 ### UI Style and Brand System (`/ui-style`)
 
-ClawCode includes a UI style catalog and style-routing mechanism so generated UI work can stay on-brand instead of drifting between prompts:
+ClawCode ships with a curated catalog of **54 world-class brand design systems**, ensuring generated UI work stays on-brand instead of drifting between prompts:
 
-- Manual lock, auto-pick, and hybrid style selection modes
-- Brand/domain-aware matching (`fit_surfaces`, `fit_domains`, tags, tone signals)
-- Session-level style traceability (`/ui-style why`) for explainable selection
+**Featured brands include:** Apple, Google (Material), Microsoft (Fluent), Airbnb, Stripe, Figma, Notion, Vercel, Linear, Spotify, Uber, Netflix, BMW, NVIDIA, SpaceX, Coinbase, HashiCorp, MongoDB, Supabase, PostHog, Sentry, Replicate, Runway, ElevenLabs, Cursor, Warp, Raycast, Cal.com, Intercom, Airtable, Miro, Sanity, Webflow, Framer, Mintlify, Cohere, Mistral AI, Together AI, xAI, MiniMax, Composio, Lovable, VoltAgent, Ollama, OpenCode, Resend, Revolut, Wise, Kraken, Zapier, Clay, ClickHouse, IBM, Pinterest, and Expo.
+
+Each brand entry includes:
+- **Design tokens**: primary colors, typography, radius, shadows
+- **Domain fit**: which industries and surfaces the style suits best
+- **Tone keywords**: the emotional signature (e.g., "trustworthy + minimal" for Stripe)
+- **Surface compatibility**: where the style shines and where it should be avoided
+
+Style routing supports manual lock, auto-pick, and hybrid selection modes, with session-level traceability (`/ui-style why`) for explainable brand decisions.
 
 ### Tooling Surface
 
