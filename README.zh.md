@@ -80,6 +80,8 @@ ClawCode 的每一个架构决策都基于四大核心原则：
 | 会话无记忆 | **ECAP/TECAP 持久化学习** |
 | 输出不可追踪 | **工作流产物可复查、可验收** |
 | 后端耦合重 | **模型/Provider 解耦，可替换扩展** |
+| 不支持个人知识管理 | **DeepNote 知识库 + 笔记互操作，个人/团队知识沉淀** |
+| 一刀切通用方案 | **12 个内置垂直领域 + 可扩展领域注册表** |
 
 ## 核心能力
 
@@ -238,6 +240,32 @@ ClawCode 从设计上支持垂直领域扩展和个人专业资产注入：
 - 插件、slash、skills 体系承载团队专属流程
 - ECAP/TECAP + evolved artifacts 形成可复用组织记忆
 
+### 内置领域模型（12 个垂直行业）
+
+ClawCode 内置 **12 个开箱即用的领域模型**，每个领域都包含类型化实体、关系映射、验证规则和自动提取模式：
+
+| 领域 | 核心实体 | 典型应用场景 |
+|------|---------|------------|
+| **医疗健康** | HealthRecord, VitalSign, Medication | 患者档案管理、体征追踪、处方管理 |
+| **医学诊疗** | Disease, Medication | ICD-10 编码诊断、症状追踪、治疗方案 |
+| **金融投资** | FinancialProduct, Transaction, RiskIndicator | 投资组合管理、交易日志、风险监控 |
+| **法律服务** | LawArticle, Case | 法规索引、判例检索、合同分析 |
+| **教育培训** | Course, KnowledgePoint, LearningPath | 课程设计、能力追踪、学习路径规划 |
+| **市场营销** | Campaign, Customer, Channel | 营销活动规划、受众细分、渠道分析 |
+| **人力资源** | Employee, JobPosting, PerformanceReview | 人才管理、招聘追踪、绩效评估 |
+| **智能制造** | Process, QualityCheck, Equipment | 标准作业程序、质检流程、设备维护 |
+| **房地产** | Property, Transaction, Contract | 房源管理、交易追踪、租约管理 |
+| **学术研究** | Paper, Experiment, Dataset | 文献管理、实验记录、数据集目录 |
+| **技术开发** | APIEndpoint, DesignPattern, TechStack | API 文档、模式库、技术栈盘点 |
+| **自定义** | 用户自定义 | 通过 `DomainSchema` JSON + `DomainRegistry` 扩展 |
+
+每个领域模型包含：
+- **类型化实体定义**：带验证规则和正则表达式模式
+- **关系映射**：一对一、一对多、多对多
+- **自动提取模式**：支持 PDF、CSV、Markdown 导入
+- **搜索配置**：字段权重提升和同义词支持
+- **双语分类体系**（中英文）：支持跨语言检索
+
 ### 内嵌领域实例
 
 - **工程研发**：架构决策、测试策略、验证清单的持续复用
@@ -260,10 +288,21 @@ ClawCode 采用分层可组合架构：
 
 ### 1）安装
 
+**Windows：**
+
 ```bash
 cd clawcode
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1   # Windows
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+**Linux / macOS：**
+
+```bash
+cd clawcode
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
