@@ -26,11 +26,11 @@
 </p>
 
 <p align="center">
-  <a href="#快速开始">快速开始</a> •
-  <a href="#为什么是-clawcode">为什么是 ClawCode</a> •
+  <a href="#clawcode-的诞生故事">我们的故事</a> •
+  <a href="#设计哲学">设计哲学</a> •
   <a href="#差异化优势">差异化优势</a> •
   <a href="#核心能力">核心能力</a> •
-  <a href="#research--researchteam">Research & ResearchTeam</a> •
+  <a href="#research--researchteam">ResearchTeam</a> •
   <a href="#知识生态deepnote--笔记互操作">知识生态</a> •
   <a href="#领域扩展与专业知识注入">领域扩展</a> •
   <a href="#架构一览">架构一览</a> •
@@ -41,19 +41,35 @@
 
 ---
 
-ClawCode 不是"会聊天的代码补全器"，而是一个可以落地结果的工程系统。
-它把 **Agent 运行时**、**工具执行层**、**工作流编排**、**经验学习机制**整合为统一能力，面向真实研发场景持续产出。
+## ClawCode 的诞生故事
 
-## 为什么是 ClawCode
+2024 年，DeepElementLab 团队在数十个工程团队中反复看到同一个场景：一位开发者花了一个小时与 AI 助手调试 API 错误处理模式，两天后同样的问题在新会话中再次出现，他却不得不从零开始。AI 助手是无状态的，知识像水蒸气一样消散了。
 
-多数 AI 编程工具擅长演示，ClawCode 擅长交付：
+我们提出了一个系统级问题：**如果 AI 编程助手能够记忆、学习、进化，会怎样？**
 
-- **重执行，不止建议**：命令可运行、文件可改写、结果可验证。
-- **重协作，不止单 Agent**：`/clawteam` 与 `research team` 支持多角色并行协同。
-- **重沉淀，不止一次性会话**：ECAP/TECAP 把可复用经验持续写回。
-- **重开放，不止单厂商绑定**：Provider 抽象层 + OpenAI 兼容 API + 可扩展适配器。
+不是那种聊天记录缓冲区式的"记忆"，而是像资深工程师积累组织知识的方式——调试模式、工具序列、修复手册——并随着时间不断精炼。这就是 ClawCode 的起源。
 
-> 想法 -> 规划 -> 执行 -> 验证 -> 评审 -> 学习
+ClawCode 的名字源自工匠之爪：精准、持久，既能进行精细操作，也能承担繁重任务。它代表了我们的信念：AI 编程工具应该是**工程仪器**，而不仅仅是对话玩具。我们为那些交付生产代码的团队而构建，而非只做原型的团队。
+
+今天，ClawCode 将 **Agent 运行时**、**工具执行层**、**工作流编排**、**经验学习机制**整合为统一的开发者系统。它从零开始重新构想，具备结构化记忆、受控自主性和多代理协作能力。
+
+## 设计哲学
+
+ClawCode 的每一个架构决策都基于四大核心原则：
+
+### 1. 执行优于建议
+我们相信 AI 助手应该**做**，而不只是建议。命令可运行、文件可改写、结果可验证。每一次对话都是带有可观察副作用的工程动作。
+
+### 2. 编排优于独白
+单 Agent 瓶颈是扩展性的反模式。基于角色的协作（`/clawteam`、`research team`）用协调一致的专家团队取代孤独的助手——架构、实现、质量、交付——共同追求收敛性成果。
+
+### 3. 学习优于无状态
+会话不应是一次性的。我们的三层经验模型（**本能 → ECAP → TECAP**）将重复行为转化为可复用、可版本化的工件。系统从工具轨迹中学习，聚类模式，并在治理下进化技能。
+
+### 4. 平台优于锁定
+你的工具应该服务于你的工作流，而非某个厂商的生态系统。Provider 无关的模型层、OpenAI 兼容的 API 端点、可扩展的工具适配器，确保你拥有自己的基础设施。
+
+> **ClawCode 循环：** 想法 → 规划 → 执行 → 验证 → 评审 → 学习
 
 ## 差异化优势
 
@@ -98,11 +114,17 @@ clawcode -p "把 git 变更整理为发布说明" -f json
 
 ### UI 风格与品牌系统（`/ui-style`）
 
-ClawCode 内置 UI 风格目录和风格路由机制，让生成结果"贴品牌、贴场景"，而不是每次从零飘移：
+ClawCode 内置精心策划的 **54 个世界级品牌设计系统**，确保生成的 UI 工作贴品牌、贴场景，而不是在提示间漂移：
 
-- 支持手动锁定、自动选择、混合选择三种模式
-- 基于 `fit_surfaces`、`fit_domains`、tags、语气信号的匹配
-- 可解释选择路径（`/ui-style why`），便于团队复盘与规范化
+**涵盖品牌包括：** Apple、Google (Material)、Microsoft (Fluent)、Airbnb、Stripe、Figma、Notion、Vercel、Linear、Spotify、Uber、Netflix、BMW、NVIDIA、SpaceX、Coinbase、HashiCorp、MongoDB、Supabase、PostHog、Sentry、Replicate、Runway、ElevenLabs、Cursor、Warp、Raycast、Cal.com、Intercom、Airtable、Miro、Sanity、Webflow、Framer、Mintlify、Cohere、Mistral AI、Together AI、xAI、MiniMax、Composio、Lovable、VoltAgent、Ollama、OpenCode、Resend、Revolut、Wise、Kraken、Zapier、Clay、ClickHouse、IBM、Pinterest、Expo。
+
+每个品牌条目包含：
+- **设计令牌**：主色、字体、圆角、阴影
+- **领域适配**：该风格最适合哪些行业和场景
+- **语气关键词**：情感特征（例如 Stripe 的"可信 + 极简"）
+- **场景兼容性**：风格在哪些场景出彩，在哪些场景应避免
+
+风格路由支持手动锁定、自动选择、混合选择三种模式，并具备会话级可追溯性（`/ui-style why`），让品牌决策可解释、可复盘。
 
 ### 工具执行面
 
