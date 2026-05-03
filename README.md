@@ -128,6 +128,8 @@ Each brand entry includes:
 
 Style routing supports manual lock, auto-pick, and hybrid selection modes, with session-level traceability (`/ui-style why`) for explainable brand decisions.
 
+**Extended UI style support:**  With Free UI, featuring <a href="https://github.com/deepelementlab/openstyle">50+ categories and 270+ design styles</a>, covering nearly all major brand types.Empower AI with a deeper understanding of UI aesthetics — design any style you want with UI effects that match your brand.
+
 ### Tooling Surface
 
 Built-in tool categories include:
