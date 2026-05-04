@@ -18,6 +18,7 @@ from openai import AsyncOpenAI
 from ..openai_compat.adapter import AdapterContext, NullAdapter, select_openai_compat_adapter
 from ..base import (
     BaseProvider,
+    BillingError,
     CacheStats,
     ProviderEvent,
     ProviderEventType,
@@ -95,6 +96,26 @@ _THINKING_ERROR_KEYWORDS = frozenset({
 def _is_thinking_mode_error(exc: Exception) -> bool:
     err_str = str(exc).lower()
     return any(kw in err_str for kw in _THINKING_ERROR_KEYWORDS)
+
+
+def _check_billing_error(exc: Exception) -> None:
+    err_str = str(exc).lower()
+    raw_status = getattr(exc, "status_code", None)
+    status_code = getattr(raw_status, "value", raw_status) if raw_status is not None else None
+    if (
+        status_code == 402
+        or "insufficient balance" in err_str
+        or "insufficient_balance" in err_str
+        or ("billing" in err_str and "limit" in err_str)
+        or "payment required" in err_str
+        or "quota exceeded" in err_str
+    ):
+        raise BillingError(
+            "API account has insufficient balance. Please top up your API credits or check your billing plan.",
+            provider="openai",
+            model=getattr(exc, "model", None),
+            original=exc,
+        ) from exc
 
 
 class OpenAIProvider(BaseProvider):
@@ -359,6 +380,7 @@ class OpenAIProvider(BaseProvider):
         try:
             response = await self._with_retry(_do_call)
         except Exception as e:
+            _check_billing_error(e)
             if not _is_thinking_mode_error(e):
                 raise
             for msg in messages:
@@ -486,6 +508,7 @@ class OpenAIProvider(BaseProvider):
         try:
             stream = await self._with_retry(_start_stream)
         except Exception as e:
+            _check_billing_error(e)
             if not _is_thinking_mode_error(e):
                 raise
             for msg in messages:

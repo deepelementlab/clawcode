@@ -419,6 +419,12 @@ class AuthenticationError(ProviderError):
     pass
 
 
+class BillingError(ProviderError):
+    """Raised when the provider account has insufficient balance or credits."""
+
+    pass
+
+
 # Streaming utilities
 
 

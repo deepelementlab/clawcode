@@ -177,8 +177,8 @@ def _make_unified_diff(
     before: str,
     after: str,
     path: str,
-    max_lines: int = 400,
-    max_chars: int = 20000,
+    max_lines: int = 200,
+    max_chars: int = 8000,
 ) -> tuple[str, bool]:
     """Create a unified diff (truncated for TUI safety)."""
     a = before.splitlines(keepends=False)
@@ -190,7 +190,7 @@ def _make_unified_diff(
             fromfile=f"a/{path}",
             tofile=f"b/{path}",
             lineterm="",
-            n=3,
+            n=1,
         )
     )
     if not diff_lines:
@@ -332,37 +332,14 @@ class WriteTool(BaseTool):
     def info(self) -> ToolInfo:
         return ToolInfo(
             name="write",
-            description=(
-                "Write content to a file. Creates the file if it doesn't exist, "
-                "overwrites if it does. Uses atomic writes (tmp+rename) to prevent "
-                "partial/corrupt files. For very large files (>50KB), use multiple "
-                "calls with append=true to write in chunks."
-            ),
+            description="Write content to a file (create or overwrite). For large files (>50KB), use append=true.",
             parameters={
                 "type": "object",
                 "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Path to the file to write.",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Content to write to the file.",
-                    },
-                    "create_dirs": {
-                        "type": "boolean",
-                        "description": (
-                            "Create parent directories if they don't exist "
-                            "(default: true)."
-                        ),
-                    },
-                    "append": {
-                        "type": "boolean",
-                        "description": (
-                            "If true, append content to the end of the file "
-                            "instead of overwriting (default: false)."
-                        ),
-                    },
+                    "file_path": {"type": "string", "description": "File path."},
+                    "content": {"type": "string", "description": "Content to write."},
+                    "create_dirs": {"type": "boolean", "description": "Create parent dirs (default: true)."},
+                    "append": {"type": "boolean", "description": "Append instead of overwrite (default: false)."},
                 },
                 "required": ["file_path", "content"],
             },
@@ -374,7 +351,10 @@ class WriteTool(BaseTool):
         call: ToolCall,
         context: ToolContext,
     ) -> ToolResponse:
-        params = _coerce_tool_params(call)
+        if isinstance(call.input, dict) and "file_path" in call.input:
+            params = call.input
+        else:
+            params = _coerce_tool_params(call)
         file_path = _get_param(params, "file_path", "filePath", "path", "filename")
         content = _get_param(params, "content", "text", default="")
         create_dirs = params.get("create_dirs", True)
@@ -425,8 +405,8 @@ class WriteTool(BaseTool):
         create_dirs: bool,
         append: bool,
     ) -> ToolResponse:
-        _DIFF_SIZE_LIMIT = 100_000
-        _DIFF_SKIP_THRESHOLD = 50_000
+        _DIFF_SIZE_LIMIT = 20_000
+        _DIFF_SKIP_THRESHOLD = 20_000
 
         existed = False
         before = ""
@@ -449,13 +429,13 @@ class WriteTool(BaseTool):
                 before = ""
 
         try:
-            await self._atomic_write(path, content, create_dirs, append)
+            await asyncio.to_thread(self._atomic_write, path, content, create_dirs, append)
         except OSError as e:
             last_err = str(e)
             for attempt in range(self._WRITE_RETRY_COUNT):
                 await asyncio.sleep(0.3 * (attempt + 1))
                 try:
-                    await self._atomic_write(path, content, create_dirs, append)
+                    await asyncio.to_thread(self._atomic_write, path, content, create_dirs, append)
                     break
                 except OSError as e2:
                     last_err = str(e2)
@@ -465,7 +445,7 @@ class WriteTool(BaseTool):
                     is_error=True,
                 )
 
-        size = len(content.encode("utf-8"))
+        size = len(content)
         lines = content.count("\n") + 1
         try:
             total_size = path.stat().st_size
@@ -582,7 +562,10 @@ class EditTool(BaseTool):
         Returns:
             Tool response
         """
-        params = _coerce_tool_params(call)
+        if isinstance(call.input, dict) and "file_path" in call.input:
+            params = call.input
+        else:
+            params = _coerce_tool_params(call)
         file_path = _get_param(params, "file_path", "filePath", "path", "filename")
         replacements = params.get("replacements", [])
 
@@ -742,7 +725,10 @@ class PatchTool(BaseTool):
         Returns:
             Tool response
         """
-        params = _coerce_tool_params(call)
+        if isinstance(call.input, dict) and "file_path" in call.input:
+            params = call.input
+        else:
+            params = _coerce_tool_params(call)
         file_path = _get_param(params, "file_path", "filePath", "path", "filename")
         patch_content = _get_param(params, "patch", "diff", default="")
 

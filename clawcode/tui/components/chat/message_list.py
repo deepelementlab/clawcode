@@ -149,11 +149,13 @@ def _normalize_tool_chunk(chunk: str) -> str:
     # Normalize carriage-return based progress updates to plain lines.
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     # If model emitted escaped newlines as plain text, unwrap for readability.
-    if "\\r\\n" in text and "\r\n" not in text:
+    # Only replace when the text is clearly using escaped newlines (multiple occurrences
+    # and no real newlines present), to avoid breaking JSON strings with \n literals.
+    if text.count("\\r\\n") > 2 and "\r\n" not in text:
         text = text.replace("\\r\\n", "\n")
-    if "\\n" in text and "\n" not in text:
+    if text.count("\\n") > 2 and "\n" not in text:
         text = text.replace("\\n", "\n")
-    if "\\t" in text and "\t" not in text:
+    if text.count("\\t") > 2 and "\t" not in text:
         text = text.replace("\\t", "    ")
     return _sanitize_ansi_for_tui(text)
 
@@ -632,6 +634,7 @@ class _UserMessageWidget(_MessageWidget):
         color: #d8dee9;
         padding: 0 1;
         margin: 1 0 0 0;
+        background: $surface-darken-1;
     }
     """
 
@@ -709,8 +712,8 @@ class _AssistantMessageWidget(_MessageWidget):
     }
     """
 
-    # 150ms throttle: reduces Markdown re-parse frequency with cached renderable.
-    _REFRESH_INTERVAL = 0.15
+    # 80ms throttle: smoother streaming while still avoiding excessive Markdown re-parse.
+    _REFRESH_INTERVAL = 0.08
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__("assistant", **kwargs)
@@ -1000,7 +1003,7 @@ class _ToolResultWidget(_MessageWidget):
         "write", "edit", "patch", "read", "ls", "glob", "grep", "find",
     })
     _MAX_COLLAPSED = 5
-    _MAX_CHARS = 20_000
+    _MAX_CHARS = 8_000
 
     DEFAULT_CSS = """
     _ToolResultWidget {
@@ -1043,7 +1046,7 @@ class _ToolResultWidget(_MessageWidget):
             return
         self.result += f"\n[[{tag}]]{normalized}"
         now = time.monotonic()
-        if now - self._last_render_at >= 0.10:
+        if now - self._last_render_at >= 0.05:
             self._last_render_at = now
             # layout=False during streaming: panel border/title height is fixed.
             self.refresh(layout=False)
@@ -1228,9 +1231,10 @@ class _ToolResultWidget(_MessageWidget):
 
     def render(self) -> RenderableType:
         c = _active_chat()
-        # ASCII-only icons to avoid encoding issues on Windows terminals
-        running_dots = "." * (self._pulse_frame + 1)
-        icon = running_dots if not self._finalized else ("ERR" if self.is_error else "OK")
+        # Rotating spinner for running tools; static icon for finalized.
+        _PULSE_ICONS = ["◐", "◓", "◑", "◒"]
+        running_icon = _PULSE_ICONS[self._pulse_frame % len(_PULSE_ICONS)]
+        icon = running_icon if not self._finalized else ("ERR" if self.is_error else "OK")
         status = self._status_str()
 
         raw = (self.result or "").lstrip("\n")
@@ -1297,7 +1301,7 @@ class _ToolResultWidget(_MessageWidget):
             return Panel(
                 body,
                 title=title,
-                subtitle=running_dots,
+                subtitle=running_icon,
                 border_style=c.border_error if self.is_error else c.border,
                 padding=(0, 1),
             )
@@ -1316,7 +1320,7 @@ class _ToolResultWidget(_MessageWidget):
                 diff_text = diff_text[-self._MAX_CHARS:]
 
             diff_subtitle = (
-                f"{running_dots}  ·  click to collapse"
+                f"{running_icon}  ·  click to collapse"
                 if not self._finalized
                 else "click to collapse"
             )
@@ -1348,7 +1352,7 @@ class _ToolResultWidget(_MessageWidget):
             body.append_text(self._decode_lines(raw_lines))
 
         if not self._finalized:
-            gen_subtitle = running_dots
+            gen_subtitle = running_icon
         elif total_lines > self._MAX_COLLAPSED:
             gen_subtitle = "click to collapse"
         else:
@@ -1389,4 +1393,10 @@ class _ErrorMessageWidget(_MessageWidget):
         Returns:
             Renderable content
         """
-        return f"Error: {self.error}"
+        c = _active_chat()
+        return Panel(
+            Text(self.error, style=f"bold {c.txt_error}"),
+            title="Error",
+            border_style=c.border_error,
+            padding=(0, 1),
+        )

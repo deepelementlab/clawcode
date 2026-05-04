@@ -10,6 +10,7 @@ from ..app import create_app
 from ..config.settings import load_settings
 from .config import default_output_dir
 from .engine.orchestrator import ResearchOrchestrator
+from .engine.team_orchestrator import ResearchTeamOrchestrator, ResearchTeamRunConfig
 from .engine.workflow import WORKFLOW_CHOICES, normalize_workflow
 from .types import ResearchTask
 
@@ -46,7 +47,11 @@ class ResearchApp:
                 output_dir=out,
                 model_override=model,
             )
-            orch = ResearchOrchestrator(app_ctx)
+            orch = (
+                ResearchTeamOrchestrator(app_ctx)
+                if task.workflow_type == "teamresearch"
+                else ResearchOrchestrator(app_ctx)
+            )
             async for event in orch.run(task):
                 if event.kind in ("phase", "warning", "error", "done"):
                     print(f"[{event.kind}] {event.payload}")
@@ -65,6 +70,67 @@ class ResearchApp:
     ) -> None:
         asyncio.run(
             self.run_workflow_async(topic, workflow, output, model, cwd=cwd, debug=debug)
+        )
+
+    async def run_team_workflow_async(
+        self,
+        topic: str,
+        output: Path | None,
+        *,
+        roles: list[str] | None = None,
+        strategy: str = "hybrid",
+        max_iters: int = 5,
+        cwd: Path | None = None,
+        debug: bool = False,
+    ) -> None:
+        from ..db import close_database
+
+        app_ctx = await self._ensure_ctx(cwd, debug)
+        try:
+            base = Path(app_ctx.settings.working_directory).resolve()
+            out = output.resolve() if output else default_output_dir(base)
+            out.mkdir(parents=True, exist_ok=True)
+            task = ResearchTask(
+                topic=topic,
+                workflow_type="teamresearch",
+                output_dir=out,
+                model_override=None,
+            )
+            orch = ResearchTeamOrchestrator(
+                app_ctx,
+                run_config=ResearchTeamRunConfig(
+                    strategy=strategy,
+                    max_iterations=max(1, int(max_iters)),
+                    selected_roles=list(roles or []),
+                ),
+            )
+            async for event in orch.run(task):
+                if event.kind in ("phase", "warning", "error", "done"):
+                    print(f"[{event.kind}] {event.payload}")
+        finally:
+            await close_database()
+
+    def run_team_workflow(
+        self,
+        topic: str,
+        output: Path | None,
+        *,
+        roles: list[str] | None = None,
+        strategy: str = "hybrid",
+        max_iters: int = 5,
+        cwd: Path | None = None,
+        debug: bool = False,
+    ) -> None:
+        asyncio.run(
+            self.run_team_workflow_async(
+                topic,
+                output,
+                roles=roles,
+                strategy=strategy,
+                max_iters=max_iters,
+                cwd=cwd,
+                debug=debug,
+            )
         )
 
     async def run_repl_async(self, *, cwd: Path | None = None, debug: bool = False) -> None:

@@ -6,6 +6,7 @@ from .comparison import phases_compare
 from .deep_research import phases_deep
 from .literature_review import phases_literature
 from .replicate import phases_replicate
+from .team_research import phases_team_research
 
 __all__ = [
     "WorkflowPhase",
@@ -15,4 +16,5 @@ __all__ = [
     "phases_deep",
     "phases_literature",
     "phases_replicate",
+    "phases_team_research",
 ]

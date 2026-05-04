@@ -292,7 +292,7 @@ BUILTIN_SLASH_COMMANDS: list[tuple[str, str]] = [
     ),
     (
         "research",
-        "Run research workflows in-chat (`/research start|audit|list-prompts|list-workflows|help`)",
+        "Run research workflows in-chat (`/research start|audit|team|list-prompts|list-workflows|help`)",
     ),
     (
         "learn",

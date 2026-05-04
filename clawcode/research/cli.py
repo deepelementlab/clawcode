@@ -9,6 +9,7 @@ import click
 
 from .app import ResearchApp
 from .engine.workflow import WORKFLOW_CHOICES, normalize_workflow
+from .team.cli_args import parse_roles
 
 
 class _CwdPath(click.Path):
@@ -148,6 +149,56 @@ def research_audit(
         _dry_run(target, "audit", cwd, debug)
         return
     ResearchApp().run_workflow(target, "audit", output, None, cwd=cwd, debug=debug)
+
+
+@research_cli.command("team")
+@click.argument("topic")
+@click.option("--output", "-o", type=click.Path(path_type=Path), default=None)
+@click.option("--roles", type=str, default="", help="Comma-separated role ids.")
+@click.option(
+    "--strategy",
+    type=click.Choice(["parallel", "sequential", "hybrid"], case_sensitive=False),
+    default="hybrid",
+    help="Team collaboration strategy.",
+)
+@click.option("--max-iters", type=int, default=5, help="Maximum collaboration iterations.")
+@click.option("-c", "--cwd", type=CWD_PATH, default=None)
+@click.option("-d", "--debug", is_flag=True, default=False)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Validate team run configuration and exit without calling the LLM.",
+)
+def research_team(
+    topic: str,
+    output: Path | None,
+    roles: str,
+    strategy: str,
+    max_iters: int,
+    cwd: Path | None,
+    debug: bool,
+    dry_run: bool,
+) -> None:
+    """Run collaborative ResearchTeam workflow."""
+    role_list = parse_roles(roles)
+    if dry_run:
+        click.echo("research.team.enabled=True")
+        click.echo(f"topic={topic!r}")
+        click.echo(f"roles={role_list!r}")
+        click.echo(f"strategy={strategy}")
+        click.echo(f"max_iters={max(1, int(max_iters))}")
+        click.echo("Dry run OK — ResearchTeam config parsed; no LLM calls made.")
+        return
+    ResearchApp().run_team_workflow(
+        topic,
+        output,
+        roles=role_list,
+        strategy=strategy,
+        max_iters=max(1, int(max_iters)),
+        cwd=cwd,
+        debug=debug,
+    )
 
 
 def register_research_cli(cli: click.Group) -> None:

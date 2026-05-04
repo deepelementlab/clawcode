@@ -1860,10 +1860,12 @@ async def handle_builtin_slash(
             "- `/research list-prompts`\n"
             "- `/research start <topic...> [-w <workflow>] [-m <model>] [-o <output>] [--dry-run]`\n"
             "- `/research audit <target...> [-o <output>] [--dry-run]`\n\n"
+            "- `/research team <topic...> [--roles a,b,c] [--strategy parallel|sequential|hybrid] [--max-iters N] [--dry-run]`\n\n"
             "Examples:\n"
             "- `/research start 量子纠错 -w deepresearch -o ./outputs/qec`\n"
             "- `/research start LLM scaling laws -w peerreview`\n"
             "- `/research audit https://github.com/example/repo`\n"
+            "- `/research team 量子纠错 --roles literature_researcher,deep_analyst,fact_verifier --max-iters 5`\n"
             "- `/research list-prompts`\n"
         )
         try:
@@ -1906,7 +1908,7 @@ async def handle_builtin_slash(
             lines.append("\nRun with `/research start <topic> -w <template-id>`.")
             return BuiltinSlashOutcome(kind="assistant_message", assistant_text="".join(lines))
 
-        if sub not in {"start", "audit"}:
+        if sub not in {"start", "audit", "team"}:
             return BuiltinSlashOutcome(
                 kind="assistant_message",
                 assistant_text=f"Unknown `/research` subcommand: `{sub}`\n\n{usage}",
@@ -1916,6 +1918,9 @@ async def handle_builtin_slash(
         model: str | None = None
         output: str | None = None
         dry_run = False
+        strategy = "hybrid"
+        max_iters = 5
+        roles = ""
         free: list[str] = []
         i = 1
         while i < len(parts):
@@ -1942,12 +1947,33 @@ async def handle_builtin_slash(
                 dry_run = True
                 i += 1
                 continue
+            if t == "--strategy":
+                if i + 1 >= len(parts):
+                    return BuiltinSlashOutcome(kind="assistant_message", assistant_text=f"Missing value for `{t}`.\n\n{usage}")
+                strategy = parts[i + 1].strip().lower()
+                i += 2
+                continue
+            if t == "--max-iters":
+                if i + 1 >= len(parts):
+                    return BuiltinSlashOutcome(kind="assistant_message", assistant_text=f"Missing value for `{t}`.\n\n{usage}")
+                try:
+                    max_iters = max(1, int(parts[i + 1]))
+                except ValueError:
+                    return BuiltinSlashOutcome(kind="assistant_message", assistant_text=f"Invalid integer for `{t}`.\n\n{usage}")
+                i += 2
+                continue
+            if t == "--roles":
+                if i + 1 >= len(parts):
+                    return BuiltinSlashOutcome(kind="assistant_message", assistant_text=f"Missing value for `{t}`.\n\n{usage}")
+                roles = parts[i + 1].strip()
+                i += 2
+                continue
             free.append(t)
             i += 1
 
         subject = " ".join(free).strip()
         if not subject:
-            kind = "topic" if sub == "start" else "target"
+            kind = "topic" if sub in {"start", "team"} else "target"
             return BuiltinSlashOutcome(
                 kind="assistant_message",
                 assistant_text=f"`/research {sub}` requires a {kind}.\n\n{usage}",
@@ -1969,6 +1995,29 @@ async def handle_builtin_slash(
                 "2) Otherwise run the selected research workflow end-to-end using research tools.\n"
                 "3) Return phase-by-phase progress summary and final artifact paths.\n"
                 "4) Mention if DeepNote/ECAP closed-loop export is enabled and whether it was triggered.\n"
+            )
+            return BuiltinSlashOutcome(kind="agent_prompt", agent_user_text=prompt)
+
+        if sub == "team":
+            if strategy not in {"parallel", "sequential", "hybrid"}:
+                return BuiltinSlashOutcome(
+                    kind="assistant_message",
+                    assistant_text="`--strategy` must be one of: parallel, sequential, hybrid.",
+                )
+            prompt = (
+                "You are executing the in-chat `/research team` workflow.\n"
+                f"- Topic: {subject}\n"
+                f"- Workflow: teamresearch\n"
+                f"- Roles: {roles or '(auto-default team roles)'}\n"
+                f"- Strategy: {strategy}\n"
+                f"- Max iterations: {max_iters}\n"
+                f"- Output dir: {output or './outputs/research-team'}\n"
+                f"- Dry run: {'yes' if dry_run else 'no'}\n\n"
+                "Tasks:\n"
+                "1) If dry-run=yes, only validate config and summarize planned role orchestration.\n"
+                "2) Otherwise run the ResearchTeam workflow (parallel role collaboration).\n"
+                "3) For each phase, report role outputs, merge/conflict handling, and quality metrics.\n"
+                "4) Return final summary path and any generated ResearchTECAP path.\n"
             )
             return BuiltinSlashOutcome(kind="agent_prompt", agent_user_text=prompt)
 

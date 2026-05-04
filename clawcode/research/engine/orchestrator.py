@@ -38,6 +38,7 @@ from ..workflows import (
     phases_deep,
     phases_literature,
     phases_replicate,
+    phases_team_research,
 )
 from .prompt_workflow import PromptWorkflowEngine
 from .workflow import normalize_workflow
@@ -128,6 +129,8 @@ class ResearchOrchestrator:
             return phases_compare(task.topic, slug, out_dir)
         if wf == "replicate":
             return phases_replicate(task.topic, slug, out_dir)
+        if wf == "teamresearch":
+            return phases_team_research(task.topic, slug, out_dir)
         return phases_deep(task.topic, slug, out_dir)
 
     async def run(self, task: ResearchTask) -> AsyncIterator[ResearchEvent]:

@@ -211,11 +211,11 @@ class ClawCodeApp(App):
 
                 def on_dialog_closed(result: object) -> None:
                     if result is True:
-                        req.status = PermissionStatus.GRANTED
+                        req._resolve(PermissionStatus.GRANTED)
                     elif result == "session":
-                        req.status = PermissionStatus.SESSION_GRANTED
+                        req._resolve(PermissionStatus.SESSION_GRANTED)
                     else:
-                        req.status = PermissionStatus.DENIED
+                        req._resolve(PermissionStatus.DENIED)
                     if not dialog_done.done():
                         dialog_done.set_result(None)
 
@@ -235,9 +235,7 @@ class ClawCodeApp(App):
                             timeout=_PERMISSION_DIALOG_TIMEOUT_S,
                         )
                     except asyncio.TimeoutError:
-                        # Auto-deny on timeout; ensure dialog_done is resolved so
-                        # any concurrent waiter unblocks cleanly.
-                        req.status = PermissionStatus.DENIED
+                        req._resolve(PermissionStatus.DENIED)
                         if not dialog_done.done():
                             dialog_done.set_result(None)
                         # Best-effort: dismiss the dialog if still on screen.
@@ -247,8 +245,7 @@ class ClawCodeApp(App):
                         except Exception:
                             pass
                 except Exception:
-                    # Catch push_screen / mount failures; treat as deny.
-                    req.status = PermissionStatus.DENIED
+                    req._resolve(PermissionStatus.DENIED)
                     if not dialog_done.done():
                         dialog_done.set_result(None)
                 finally:

@@ -22,6 +22,7 @@ from anthropic import (
 
 from ..base import (
     BaseProvider,
+    BillingError,
     CacheStats,
     ProviderError,
     ProviderEvent,
@@ -253,6 +254,13 @@ class AnthropicProvider(BaseProvider):
                 original=e,
             )
         except APIStatusError as e:
+            if getattr(e, "status_code", None) == 402 or "insufficient balance" in str(e).lower() or "payment required" in str(e).lower():
+                raise BillingError(
+                    "API account has insufficient balance. Please top up your API credits or check your billing plan.",
+                    provider=ModelProvider.ANTHROPIC.value,
+                    model=self.model,
+                    original=e,
+                )
             raise ProviderError(
                 f"API error: {e}",
                 provider=ModelProvider.ANTHROPIC.value,

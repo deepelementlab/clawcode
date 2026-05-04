@@ -19,7 +19,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, AsyncIterator, Literal
 
-from .base import BaseProvider, ProviderEvent, ProviderEventType, ToolCall, TokenUsage
+from .base import BaseProvider, BillingError, ProviderEvent, ProviderEventType, ToolCall, TokenUsage
 from .claw_support.iteration_budget import IterationBudget
 from .plan_policy import is_tool_allowed_in_plan_mode
 from .tool_input_validate import pilot_validate_tool_input
@@ -858,7 +858,22 @@ class Agent:
                         match event.type:
                             case ProviderEventType.ERROR:
                                 err = event.error
-                                stream_failed = str(err) if err else "Provider stream error"
+                                err_str = str(err or "").lower()
+                                if (
+                                    isinstance(err, BillingError)
+                                    or getattr(getattr(err, "original", None), "status_code", None) == 402
+                                    or "insufficient balance" in err_str
+                                    or "payment required" in err_str
+                                ):
+                                    stream_failed = (
+                                        "⚠️ API Balance Insufficient: Your API account has run out of credits.\n\n"
+                                        "Please:\n"
+                                        "1. Top up your API balance at your provider's dashboard\n"
+                                        "2. Or switch to a different model/provider in settings\n\n"
+                                        "The session has been stopped to avoid further errors."
+                                    )
+                                else:
+                                    stream_failed = str(err) if err else "Provider stream error"
                                 yield AgentEvent.error(stream_failed)
                                 break
 
@@ -1003,6 +1018,15 @@ class Agent:
                     yield AgentEvent.response(assistant_msg)
                     break
 
+                except BillingError as e:
+                    yield AgentEvent.error(
+                        f"⚠️ API Balance Insufficient: {e}\n\n"
+                        "Your API account has run out of credits. Please:\n"
+                        "1. Top up your API balance at your provider's dashboard\n"
+                        "2. Or switch to a different model/provider in settings\n\n"
+                        "The session has been stopped to avoid further errors."
+                    )
+                    break
                 except Exception as e:
                     yield AgentEvent.error(f"Error in ReAct loop: {e}")
                     break

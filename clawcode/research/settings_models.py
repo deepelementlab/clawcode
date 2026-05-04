@@ -50,6 +50,15 @@ class ResearchToolsConfig(BaseModel):
     sandbox_execute_enabled: bool = True
 
 
+class ResearchTeamConfig(BaseModel):
+    enabled: bool = True
+    max_iterations: int = 5
+    max_parallel_roles: int = 3
+    default_strategy: Literal["parallel", "sequential", "hybrid"] = "hybrid"
+    min_quality_score: float = 0.75
+    min_contract_pass_rate: float = 0.85
+
+
 class ResearchConfig(BaseModel):
     """Top-level research mode configuration (nested under Settings.research)."""
 
@@ -64,3 +73,4 @@ class ResearchConfig(BaseModel):
     sandbox: ResearchSandboxConfig = Field(default_factory=ResearchSandboxConfig)
     memory: ResearchMemoryConfig = Field(default_factory=ResearchMemoryConfig)
     tools: ResearchToolsConfig = Field(default_factory=ResearchToolsConfig)
+    team: ResearchTeamConfig = Field(default_factory=ResearchTeamConfig)
