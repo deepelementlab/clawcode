@@ -116,7 +116,7 @@ Generate structured product/design artifacts from dedicated design roles (resear
 
 ### UI Style and Brand System (`/ui-style`)
 
-ClawCode ships with a curated catalog of **54 world-class brand design systems**, ensuring generated UI work stays on-brand instead of drifting between prompts:
+ClawCode ships with a curated catalog of <a href=".claw/design/UI">**54 world-class brand design systems**</a>, ensuring generated UI work stays on-brand instead of drifting between prompts:
 
 **Featured brands include:** Apple, Google (Material), Microsoft (Fluent), Airbnb, Stripe, Figma, Notion, Vercel, Linear, Spotify, Uber, Netflix, BMW, NVIDIA, SpaceX, Coinbase, HashiCorp, MongoDB, Supabase, PostHog, Sentry, Replicate, Runway, ElevenLabs, Cursor, Warp, Raycast, Cal.com, Intercom, Airtable, Miro, Sanity, Webflow, Framer, Mintlify, Cohere, Mistral AI, Together AI, xAI, MiniMax, Composio, Lovable, VoltAgent, Ollama, OpenCode, Resend, Revolut, Wise, Kraken, Zapier, Clay, ClickHouse, IBM, Pinterest, and Expo.
 
