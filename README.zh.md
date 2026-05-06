@@ -101,7 +101,7 @@ clawcode -p "把 git 变更整理为发布说明" -f json
 
 ### UI 风格与品牌系统（`/ui-style`）
 
-ClawCode 内置精心策划的 **54 个世界级品牌设计系统**，确保生成的 UI 工作贴品牌、贴场景，而不是在提示间漂移：
+ClawCode 内置精心策划的 <a href=".claw/design/UI">**54 个世界级品牌设计系统**</a>，提供DESIGN.md，确保生成的 UI 工作贴品牌、贴场景，而不是在提示间漂移：
 
 **涵盖品牌包括：** Apple、Google (Material)、Microsoft (Fluent)、Airbnb、Stripe、Figma、Notion、Vercel、Linear、Spotify、Uber、Netflix、BMW、NVIDIA、SpaceX、Coinbase、HashiCorp、MongoDB、Supabase、PostHog、Sentry、Replicate、Runway、ElevenLabs、Cursor、Warp、Raycast、Cal.com、Intercom、Airtable、Miro、Sanity、Webflow、Framer、Mintlify、Cohere、Mistral AI、Together AI、xAI、MiniMax、Composio、Lovable、VoltAgent、Ollama、OpenCode、Resend、Revolut、Wise、Kraken、Zapier、Clay、ClickHouse、IBM、Pinterest、Expo。
 
