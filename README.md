@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <strong>Instantly access a professional team for intelligent research, design, and development.</strong>
+</p>
+
+<p align="center">
   Open-source coding agent platform with terminal-native execution, multi-agent orchestration, closed-loop learning, and a production-grade research subsystem.
 </p>
 
