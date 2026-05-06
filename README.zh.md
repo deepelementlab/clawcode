@@ -5,7 +5,7 @@
 <h1 align="center">ClawCode</h1>
 
 <p align="center">
-  <strong>面向严肃工程团队的 AI 创意开发驾驶舱。</strong>
+  <strong>面向严肃工程团队的 AI 创意开发驾驶舱，即刻拥有专业的智能研究、设计和研发团队</strong>
 </p>
 
 <p align="center">
