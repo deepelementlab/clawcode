@@ -22,6 +22,9 @@ class DeepSeekAdapter:
 
     DEEPSEEK_REASONING_MODELS: set[str] = {
         "deepseek-reasoner",
+        # V4 Pro defaults to thinking mode; tool-call loops require reasoning_content
+        # passback (see https://api-docs.deepseek.com/guides/thinking_mode).
+        "deepseek-v4-pro",
     }
 
     def __init__(self) -> None:
